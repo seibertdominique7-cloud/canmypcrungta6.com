@@ -3,7 +3,6 @@
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 
 const MAX_SCREENSHOT_SIZE_BYTES = 10 * 1024 * 1024;
-const ANALYSIS_DELAY_MS = 2000;
 const SCREENSHOT_UPLOAD_INPUT_ID = 'screenshot-upload-input';
 const SCREENSHOT_UPLOAD_ERROR_ID = 'screenshot-upload-error';
 const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
@@ -22,7 +21,11 @@ const SCREENSHOT_UPLOAD_COPY = {
   removeButton: 'Remove Image',
   analyzeButton: 'Analyze Screenshot',
   analyzingButton: 'Analyzing screenshot',
-  analysisComingSoon: 'Screenshot analysis coming soon',
+  detectedTextTitle: 'Detected Text',
+  noDetectedText: 'No text was detected in this screenshot.',
+  ocrProgressLabel: 'OCR progress',
+  ocrError:
+    'We could not read text from this screenshot. Please try a clearer image or check your connection.',
 } as const;
 
 export default function Home() {
@@ -32,7 +35,8 @@ export default function Home() {
     previewUrl,
     errorMessage,
     isAnalyzing,
-    analysisMessage,
+    ocrProgress,
+    detectedText,
     handleFileChange,
     removeImage,
     analyzeScreenshot,
@@ -78,22 +82,20 @@ export default function Home() {
             id={SCREENSHOT_UPLOAD_INPUT_ID}
             type="file"
             accept={SCREENSHOT_ACCEPT_ATTRIBUTE}
-            className="fixed -left-96 -top-96 h-px w-px overflow-hidden opacity-0"
+            className="sr-only"
             tabIndex={-1}
-            aria-hidden="true"
             aria-describedby={
               errorMessage ? SCREENSHOT_UPLOAD_ERROR_ID : undefined
             }
             onChange={handleFileChange}
           />
-          <button
-            type="button"
+          <label
+            htmlFor={SCREENSHOT_UPLOAD_INPUT_ID}
             className="flex-1 py-4 px-8 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-emerald-500/50 text-center text-lg cursor-pointer"
             aria-label={SCREENSHOT_UPLOAD_COPY.inputLabel}
-            onClick={() => inputRef.current?.click()}
           >
             {SCREENSHOT_UPLOAD_COPY.uploadButton}
-          </button>
+          </label>
 
           {/* Secondary button - Manual Entry */}
           <a
@@ -119,7 +121,8 @@ export default function Home() {
           fileName={selectedFile?.name ?? null}
           errorMessage={errorMessage}
           isAnalyzing={isAnalyzing}
-          analysisMessage={analysisMessage}
+          ocrProgress={ocrProgress}
+          detectedText={detectedText}
           onRemove={removeImage}
           onAnalyze={analyzeScreenshot}
         />
@@ -164,23 +167,29 @@ export default function Home() {
 
 function useScreenshotUpload() {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const analysisTimeoutRef = useRef<number | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const ocrWorkerRef = useRef<OcrWorker | null>(null);
+  const ocrRunIdRef = useRef(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [ocrProgress, setOcrProgress] = useState<number | null>(null);
+  const [detectedText, setDetectedText] = useState<string | null>(null);
+
+  const terminateOcrWorker = async () => {
+    const worker = ocrWorkerRef.current;
+    ocrWorkerRef.current = null;
+    await worker?.terminate().catch(() => undefined);
+  };
 
   useEffect(() => {
     return () => {
-      if (analysisTimeoutRef.current !== null) {
-        window.clearTimeout(analysisTimeoutRef.current);
-      }
-
       if (previewUrlRef.current !== null) {
         URL.revokeObjectURL(previewUrlRef.current);
       }
+
+      void terminateOcrWorker();
     };
   }, []);
 
@@ -199,19 +208,20 @@ function useScreenshotUpload() {
     }
   };
 
-  const clearAnalysisState = () => {
-    if (analysisTimeoutRef.current !== null) {
-      window.clearTimeout(analysisTimeoutRef.current);
-      analysisTimeoutRef.current = null;
+  const clearAnalysisState = (cancelActiveWorker: boolean) => {
+    if (cancelActiveWorker) {
+      ocrRunIdRef.current += 1;
+      void terminateOcrWorker();
     }
 
     setIsAnalyzing(false);
-    setAnalysisMessage(null);
+    setOcrProgress(null);
+    setDetectedText(null);
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
-    clearAnalysisState();
+    clearAnalysisState(true);
 
     if (!file) {
       return;
@@ -242,27 +252,62 @@ function useScreenshotUpload() {
   };
 
   const removeImage = () => {
-    clearAnalysisState();
+    clearAnalysisState(true);
     setSelectedFile(null);
     clearPreviewUrl();
     setErrorMessage(null);
     resetFileInput();
   };
 
-  const analyzeScreenshot = () => {
+  const analyzeScreenshot = async () => {
     if (!selectedFile || isAnalyzing) {
       return;
     }
 
+    const runId = ocrRunIdRef.current + 1;
+    ocrRunIdRef.current = runId;
     setErrorMessage(null);
-    setAnalysisMessage(null);
+    setDetectedText(null);
+    setOcrProgress(0);
     setIsAnalyzing(true);
 
-    analysisTimeoutRef.current = window.setTimeout(() => {
-      setIsAnalyzing(false);
-      setAnalysisMessage(SCREENSHOT_UPLOAD_COPY.analysisComingSoon);
-      analysisTimeoutRef.current = null;
-    }, ANALYSIS_DELAY_MS);
+    let worker: OcrWorker | null = null;
+    const isCurrentRun = () => ocrRunIdRef.current === runId;
+
+    try {
+      const Tesseract = await import('tesseract.js');
+      worker = await Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
+        logger: (message) => {
+          if (isCurrentRun()) {
+            setOcrProgress(normalizeOcrProgress(message.progress));
+          }
+        },
+      });
+      ocrWorkerRef.current = worker;
+
+      const {
+        data: { text },
+      } = await worker.recognize(selectedFile);
+
+      if (isCurrentRun()) {
+        setOcrProgress(100);
+        setDetectedText(text);
+      }
+    } catch {
+      if (isCurrentRun()) {
+        setErrorMessage(SCREENSHOT_UPLOAD_COPY.ocrError);
+      }
+    } finally {
+      await worker?.terminate().catch(() => undefined);
+
+      if (ocrWorkerRef.current === worker) {
+        ocrWorkerRef.current = null;
+      }
+
+      if (isCurrentRun()) {
+        setIsAnalyzing(false);
+      }
+    }
   };
 
   return {
@@ -271,11 +316,21 @@ function useScreenshotUpload() {
     previewUrl,
     errorMessage,
     isAnalyzing,
-    analysisMessage,
+    ocrProgress,
+    detectedText,
     handleFileChange,
     removeImage,
     analyzeScreenshot,
   };
+}
+
+type OcrWorker = {
+  recognize: (image: File) => Promise<{ data: { text: string } }>;
+  terminate: () => Promise<unknown>;
+};
+
+function normalizeOcrProgress(progress: number) {
+  return Math.round(Math.min(1, Math.max(0, progress)) * 100);
 }
 
 function isAcceptedScreenshotFile(file: File) {
@@ -293,7 +348,8 @@ interface ScreenshotUploadPanelProps {
   fileName: string | null;
   errorMessage: string | null;
   isAnalyzing: boolean;
-  analysisMessage: string | null;
+  ocrProgress: number | null;
+  detectedText: string | null;
   onRemove: () => void;
   onAnalyze: () => void;
 }
@@ -303,11 +359,12 @@ function ScreenshotUploadPanel({
   fileName,
   errorMessage,
   isAnalyzing,
-  analysisMessage,
+  ocrProgress,
+  detectedText,
   onRemove,
   onAnalyze,
 }: ScreenshotUploadPanelProps) {
-  if (!previewUrl && !errorMessage && !isAnalyzing && !analysisMessage) {
+  if (!previewUrl && !errorMessage && !isAnalyzing && detectedText === null) {
     return null;
   }
 
@@ -350,14 +407,61 @@ function ScreenshotUploadPanel({
             </button>
           </div>
 
-          {analysisMessage ? (
-            <p className="border-t border-slate-700/50 px-4 py-4 sm:px-6 text-center text-sm font-semibold text-emerald-300">
-              {analysisMessage}
-            </p>
+          {isAnalyzing && ocrProgress !== null ? (
+            <OcrProgress progress={ocrProgress} />
+          ) : null}
+
+          {detectedText !== null ? (
+            <DetectedText text={detectedText} />
           ) : null}
         </div>
       ) : null}
     </section>
+  );
+}
+
+interface OcrProgressProps {
+  progress: number;
+}
+
+function OcrProgress({ progress }: OcrProgressProps) {
+  return (
+    <div className="border-t border-slate-700/50 px-4 py-4 sm:px-6">
+      <div className="mb-2 flex items-center justify-between text-sm font-semibold text-slate-300">
+        <span>{SCREENSHOT_UPLOAD_COPY.ocrProgressLabel}</span>
+        <span>{progress}%</span>
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-slate-950/60"
+        role="progressbar"
+        aria-label={SCREENSHOT_UPLOAD_COPY.ocrProgressLabel}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+      >
+        <div
+          className="h-full rounded-full bg-emerald-400 transition-all duration-300"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface DetectedTextProps {
+  text: string;
+}
+
+function DetectedText({ text }: DetectedTextProps) {
+  return (
+    <details className="border-t border-slate-700/50 px-4 py-4 sm:px-6" open>
+      <summary className="cursor-pointer text-sm font-bold text-emerald-300">
+        {SCREENSHOT_UPLOAD_COPY.detectedTextTitle}
+      </summary>
+      <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-700/60 bg-slate-950/60 p-4 text-left text-sm leading-relaxed text-slate-200">
+        {text || SCREENSHOT_UPLOAD_COPY.noDetectedText}
+      </pre>
+    </details>
   );
 }
 
