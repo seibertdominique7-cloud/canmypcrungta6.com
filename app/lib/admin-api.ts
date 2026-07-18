@@ -18,3 +18,29 @@ export function adminRouteError(error: unknown) {
   console.error(error);
   return Response.json({ error: 'The admin request could not be completed.' }, { status: 500 });
 }
+
+export type AdminOrderAction =
+  | { action: 'move'; direction: 'up' | 'down' }
+  | { action: 'reorder'; orderedIds: string[] };
+
+export function readAdminOrderAction(value: unknown): AdminOrderAction | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const record = value as Record<string, unknown>;
+
+  if (
+    record.action === 'move' &&
+    (record.direction === 'up' || record.direction === 'down')
+  ) {
+    return { action: 'move', direction: record.direction };
+  }
+
+  if (
+    record.action === 'reorder' &&
+    Array.isArray(record.orderedIds) &&
+    record.orderedIds.every((id): id is string => typeof id === 'string' && id.length > 0)
+  ) {
+    return { action: 'reorder', orderedIds: record.orderedIds };
+  }
+
+  return null;
+}

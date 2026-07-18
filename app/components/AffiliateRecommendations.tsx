@@ -1,16 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import type {
-  AffiliateProductRecord,
   PublicMonetizationPayload,
   PublicRecommendationSection,
   RecommendationDebugInfo,
 } from '../lib/affiliate-types';
 import type { CompatibilityResult } from '../lib/compatibility';
-import { allocateInitialProductCardLimits } from '../lib/monetization-policy';
+import {
+  allocateInitialProductCardLimits,
+  isPassingRecommendationScenario,
+} from '../lib/monetization-policy';
 import { determineRecommendationScenario } from '../lib/recommendation-scenario';
+import { RecommendationProductCard } from './RecommendationProductCard';
 
 export function AffiliateRecommendations({ result }: { result: CompatibilityResult }) {
   const scenarioCode = determineRecommendationScenario(result);
@@ -60,7 +63,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
       });
 
     return () => controller.abort();
-  }, [scenarioCode]);
+  }, [result, scenarioCode]);
 
   const isCurrentResponse = requestState.scenarioCode === scenarioCode;
   const payload = isCurrentResponse ? requestState.payload : null;
@@ -85,7 +88,60 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
 
   if (!loaded) return null;
 
-  if (!payload || displaySections.length === 0) {
+  const generalSections = displaySections.filter(
+    ({ section }) => section.purpose === 'GENERAL',
+  );
+  const prebuiltSections = (payload?.sections ?? []).filter(
+    (section) => section.purpose === 'PREBUILT',
+  );
+  const purchaseSections = isPassingRecommendationScenario(scenarioCode)
+    ? (payload?.sections ?? []).filter((section) => section.purpose === 'GAME_PURCHASE')
+    : [];
+  const [primarySection, ...secondaryGeneralSections] = generalSections;
+  const monetizedBlocks: Array<{ key: string; node: ReactNode }> = [];
+
+  if (primarySection) {
+    monetizedBlocks.push({
+      key: primarySection.section.id,
+      node: (
+        <RecommendationSection
+          description={getScenarioRecommendationContext(result)}
+          initialProductLimit={primarySection.initialProductLimit}
+          initiallyOpen={primarySection.initiallyOpen}
+          section={primarySection.section}
+        />
+      ),
+    });
+  }
+
+  if (prebuiltSections.length > 0) {
+    monetizedBlocks.push({
+      key: 'complete-gaming-pcs',
+      node: <PrebuiltRecommendationSection sections={prebuiltSections} />,
+    });
+  }
+
+  if (purchaseSections.length > 0) {
+    monetizedBlocks.push({
+      key: 'gta-vi-purchase',
+      node: <GamePurchaseRecommendationSection sections={purchaseSections} />,
+    });
+  }
+
+  for (const sectionState of secondaryGeneralSections) {
+    monetizedBlocks.push({
+      key: sectionState.section.id,
+      node: (
+        <RecommendationSection
+          initialProductLimit={sectionState.initialProductLimit}
+          initiallyOpen={sectionState.initiallyOpen}
+          section={sectionState.section}
+        />
+      ),
+    });
+  }
+
+  if (!payload || monetizedBlocks.length === 0) {
     return process.env.NODE_ENV !== 'production' ? (
       <RecommendationDebug
         debug={payload?.debug}
@@ -97,14 +153,10 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
 
   return (
     <section aria-label="Recommendations" className="grid gap-4">
-      {displaySections.map(({ section, initiallyOpen, initialProductLimit }, index) => (
-        <div className="contents" key={section.id}>
-          <RecommendationSection
-            initialProductLimit={initialProductLimit}
-            initiallyOpen={initiallyOpen}
-            section={section}
-          />
-          {index === 0 && <AffiliateDisclosure />}
+      {monetizedBlocks.map((block, index) => (
+        <div className="contents" key={block.key}>
+          {block.node}
+          {index === 0 ? <AffiliateDisclosure /> : null}
         </div>
       ))}
     </section>
@@ -128,12 +180,12 @@ function RecommendationDebug({
       <p><strong>Detected Scenario:</strong><br />{detectedScenario}</p>
       <p className="mt-2"><strong>Sections Found:</strong><br />{sectionsFound}</p>
       <p className="mt-2"><strong>Products Found:</strong><br />{productsFound}</p>
-      {debug?.databaseScenarioCode && debug.databaseScenarioCode !== detectedScenario && (
+      {debug?.databaseScenarioCode && debug.databaseScenarioCode !== detectedScenario ? (
         <p className="mt-2">Database Scenario: {debug.databaseScenarioCode}</p>
-      )}
-      {debug && !debug.scenarioEnabled && (
+      ) : null}
+      {debug && !debug.scenarioEnabled ? (
         <p className="mt-2">The matching scenario is disabled.</p>
-      )}
+      ) : null}
       {debug?.disabledSections.length ? (
         <div className="mt-2">
           <strong>Disabled Sections:</strong>
@@ -162,7 +214,7 @@ function RecommendationDebug({
           </ul>
         </div>
       ) : null}
-      {error && <p className="mt-2">Request Error: {error}</p>}
+      {error ? <p className="mt-2">Request Error: {error}</p> : null}
     </aside>
   );
 }
@@ -171,10 +223,12 @@ function RecommendationSection({
   section,
   initiallyOpen,
   initialProductLimit,
+  description,
 }: {
   section: PublicRecommendationSection;
   initiallyOpen: boolean;
   initialProductLimit: number;
+  description?: string;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const [showAll, setShowAll] = useState(false);
@@ -189,109 +243,171 @@ function RecommendationSection({
   const hasMore = open && productsToRender.length < section.products.length;
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
+    <section className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.055] to-white/[0.025] shadow-xl shadow-black/10">
       <button
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"
+        className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-white/[0.025] sm:p-6"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         <span>
           <span className="block text-xs font-black uppercase tracking-[0.17em] text-violet-300">
-            {section.purpose === 'GAME_PURCHASE'
-              ? 'Game purchase'
-              : section.purpose === 'PREBUILT'
-                ? 'Complete gaming PCs'
-                : 'Recommended for this result'}
+            Recommended for this result
           </span>
           <span className="mt-1 block text-xl font-black text-white">{section.title}</span>
-          <span className="mt-1 block text-sm leading-6 text-slate-400">{section.description}</span>
+          <span className="mt-1 block max-w-3xl text-sm leading-6 text-slate-400">
+            {description ?? section.description}
+          </span>
         </span>
-        <span aria-hidden="true" className="text-xl text-slate-400">{open ? '−' : '+'}</span>
+        <span aria-hidden="true" className="text-xl text-slate-400">
+          {open ? <>&minus;</> : '+'}
+        </span>
       </button>
 
-      {open && (
-        <div className="border-t border-white/10 p-4 sm:p-5">
-          <div className={layoutClass(section.layout)}>
+      {open ? (
+        <div className="border-t border-white/10 p-4 sm:p-5 sm:pt-6">
+          <div className={layoutClass(section.layout, productsToRender.length)}>
             {productsToRender.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <RecommendationProductCard key={product.id} product={product} />
             ))}
           </div>
-          {hasMore && (
+          {hasMore ? (
             <button
               className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/10"
               onClick={() => setShowAll(true)}
               type="button"
             >
-              View more options
+              Show more recommendations
             </button>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
 
-function ProductCard({ product }: { product: AffiliateProductRecord }) {
+function PrebuiltRecommendationSection({
+  sections,
+}: {
+  sections: PublicRecommendationSection[];
+}) {
+  const products = sections
+    .flatMap((section) =>
+      section.products.map((product) => ({
+        product,
+        categoryLabel: section.title,
+      })),
+    )
+    .slice(0, 4);
+
+  if (products.length === 0) return null;
+
   return (
-    <article className="flex min-h-64 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#090d17] p-4">
-      {product.imageUrl && (
-        // Admin-entered remote URLs intentionally use a normal img element.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          alt=""
-          className="mb-4 h-32 w-full rounded-xl object-cover"
-          loading="lazy"
-          src={product.imageUrl}
-        />
-      )}
-      <div className="flex items-start justify-between gap-3">
-        <span className="rounded-full bg-violet-500/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-300">
-          {product.badge}
-        </span>
-        {product.platform && (
-          <span className="text-xs font-bold text-cyan-300">{product.platform}</span>
-        )}
-      </div>
-      <h3 className="mt-3 text-lg font-black text-white">{product.title}</h3>
-      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">
-        {product.shortDescription}
+    <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-4 shadow-lg shadow-black/10 sm:p-5">
+      <p className="text-xs font-black uppercase tracking-[0.17em] text-cyan-300">
+        Complete systems
       </p>
-      <div className="mt-auto pt-4">
-        <div className="mb-3 flex items-end justify-between gap-3 text-sm">
-          <span className="font-black text-slate-100">{product.priceText}</span>
-          <span className="text-xs text-slate-500">{product.retailer}</span>
-        </div>
-        <a
-          className="inline-flex w-full items-center justify-center rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-400"
-          href={product.affiliateUrl}
-          rel="sponsored nofollow noopener noreferrer"
-          target="_blank"
-        >
-          {product.buttonText}
-        </a>
+      <h2 className="mt-1 text-xl font-black text-white">Prefer a Complete Gaming PC?</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+        Choose a complete desktop or laptop instead of replacing individual parts.
+      </p>
+      <div className="mt-5 grid items-stretch gap-4 md:grid-cols-2">
+        {products.map(({ product, categoryLabel }) => (
+          <RecommendationProductCard
+            categoryLabel={categoryLabel}
+            compact
+            key={product.id}
+            product={product}
+          />
+        ))}
       </div>
-    </article>
+    </section>
+  );
+}
+
+function GamePurchaseRecommendationSection({
+  sections,
+}: {
+  sections: PublicRecommendationSection[];
+}) {
+  const products = sections.flatMap((section) => section.products).slice(0, 3);
+
+  if (products.length === 0) return null;
+
+  return (
+    <section className="rounded-3xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.08] to-fuchsia-500/[0.035] p-4 shadow-xl shadow-black/10 sm:p-5">
+      <p className="text-xs font-black uppercase tracking-[0.17em] text-violet-300">
+        Purchase links
+      </p>
+      <h2 className="mt-1 text-xl font-black text-white">Ready for GTA VI?</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+        View the GTA VI listing that has been enabled by the site owner.
+      </p>
+      <div className={`mt-5 ${layoutClass('featured', products.length)}`}>
+        {products.map((product) => (
+          <RecommendationProductCard compact key={product.id} product={product} />
+        ))}
+      </div>
+    </section>
   );
 }
 
 function AffiliateDisclosure() {
   return (
-    <p className="px-1 text-xs leading-5 text-slate-500">
+    <p className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-xs leading-5 text-slate-400">
       Disclosure: We may earn a commission when you purchase through links on this page, at no
       additional cost to you.
     </p>
   );
 }
 
-function layoutClass(layout: PublicRecommendationSection['layout']) {
+function getScenarioRecommendationContext(result: CompatibilityResult) {
+  const failingComponents = result.components.filter((component) => component.status === 'below');
+
+  if (failingComponents.length === 1) {
+    return `Your ${failingComponents[0].label} is below the estimated minimum requirement. These upgrades are stronger options for GTA VI.`;
+  }
+
+  if (failingComponents.length > 1) {
+    return `Your ${joinComponentLabels(failingComponents.map((component) => component.label))} are below the estimated minimum requirements. These recommendations focus on the parts holding your PC back.`;
+  }
+
+  const unknownComponents = result.components.filter(
+    (component) => component.status === 'unknown',
+  );
+
+  if (unknownComponents.length > 0) {
+    return `We could not confirm your ${joinComponentLabels(unknownComponents.map((component) => component.label))}. These options can help you compare supported hardware.`;
+  }
+
+  if (result.overall.status === 'recommended') {
+    return 'Your PC meets the estimated recommended requirement. These are optional additions for your GTA VI setup.';
+  }
+
+  return 'Your PC meets the estimated minimum requirement. These upgrades can provide more headroom for GTA VI.';
+}
+
+function joinComponentLabels(labels: string[]) {
+  if (labels.length <= 1) return labels[0] ?? 'hardware';
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`;
+}
+
+function layoutClass(
+  layout: PublicRecommendationSection['layout'],
+  productCount: number,
+) {
   if (layout === 'horizontal') {
-    return 'flex snap-x gap-4 overflow-x-auto pb-2 [&>article]:w-[min(82vw,300px)] [&>article]:shrink-0 [&>article]:snap-start';
+    return 'flex snap-x gap-5 overflow-x-auto pb-3 [&>article]:w-[min(84vw,330px)] [&>article]:shrink-0 [&>article]:snap-start';
   }
 
-  if (layout === 'featured') {
-    return 'grid gap-4 md:grid-cols-2';
+  if (productCount >= 3 && layout !== 'featured') {
+    return 'grid items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3';
   }
 
-  return 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3';
+  if (productCount === 2) {
+    return 'grid items-stretch gap-5 md:grid-cols-2';
+  }
+
+  return 'grid max-w-2xl items-stretch gap-5';
 }

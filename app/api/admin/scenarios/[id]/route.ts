@@ -1,8 +1,9 @@
-import { adminRouteError, readJson } from '../../../../lib/admin-api';
+import { adminRouteError, readAdminOrderAction, readJson } from '../../../../lib/admin-api';
 import {
   deleteScenario,
   getAdminScenarios,
   moveScenario,
+  reorderScenarios,
   updateScenario,
 } from '../../../../lib/affiliate-data';
 import { validateScenarioInput } from '../../../../lib/affiliate-validation';
@@ -16,8 +17,12 @@ export async function PATCH(request: Request, context: RouteContext<'/api/admin/
   const body = await readJson(request);
 
   try {
-    if (isMoveAction(body)) {
-      await moveScenario(id, body.direction);
+    const orderAction = readAdminOrderAction(body);
+
+    if (orderAction?.action === 'move') {
+      await moveScenario(id, orderAction.direction);
+    } else if (orderAction?.action === 'reorder') {
+      await reorderScenarios(id, orderAction.orderedIds);
     } else {
       const validation = validateScenarioInput(body);
 
@@ -52,12 +57,4 @@ export async function DELETE(
   } catch (error) {
     return adminRouteError(error);
   }
-}
-
-function isMoveAction(value: unknown): value is { action: 'move'; direction: 'up' | 'down' } {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return (
-    record.action === 'move' && (record.direction === 'up' || record.direction === 'down')
-  );
 }

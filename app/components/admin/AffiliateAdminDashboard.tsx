@@ -16,6 +16,7 @@ import type {
   RecommendationSectionInput,
   ScenarioInput,
 } from '../../lib/affiliate-validation';
+import { RecommendationProductCard } from '../RecommendationProductCard';
 
 interface AffiliateAdminDashboardProps {
   initialScenarios: RecommendationScenarioRecord[];
@@ -33,6 +34,10 @@ type Editor =
   | { kind: 'product'; value: AffiliateProductRecord | null }
   | null;
 
+type AvailabilityFilter = 'all' | 'enabled' | 'disabled';
+type AdminSort = 'order' | 'title' | 'status' | 'retailer';
+type DraggedItem = { kind: 'scenario' | 'section' | 'product'; id: string } | null;
+
 export function AffiliateAdminDashboard({
   initialScenarios,
 }: AffiliateAdminDashboardProps) {
@@ -47,6 +52,17 @@ export function AffiliateAdminDashboard({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [scenarioQuery, setScenarioQuery] = useState('');
+  const [scenarioStatus, setScenarioStatus] = useState<AvailabilityFilter>('all');
+  const [scenarioSort, setScenarioSort] = useState<AdminSort>('order');
+  const [sectionQuery, setSectionQuery] = useState('');
+  const [sectionStatus, setSectionStatus] = useState<AvailabilityFilter>('all');
+  const [sectionSort, setSectionSort] = useState<AdminSort>('order');
+  const [productQuery, setProductQuery] = useState('');
+  const [productStatus, setProductStatus] = useState<AvailabilityFilter>('all');
+  const [productSort, setProductSort] = useState<AdminSort>('order');
+  const [productRetailer, setProductRetailer] = useState('all');
+  const [draggedItem, setDraggedItem] = useState<DraggedItem>(null);
 
   const selectedScenario =
     scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0] ?? null;
@@ -63,6 +79,74 @@ export function AffiliateAdminDashboard({
         })),
       ),
     [scenarios],
+  );
+  const visibleScenarios = useMemo(
+    () =>
+      filterAndSort(
+        scenarios,
+        scenarioQuery,
+        scenarioStatus,
+        scenarioSort,
+        (scenario) =>
+          `${scenario.code} ${scenario.displayName} ${scenario.resultHeading}`,
+        (scenario) => scenario.displayName,
+      ),
+    [scenarios, scenarioQuery, scenarioSort, scenarioStatus],
+  );
+  const visibleSections = useMemo(
+    () =>
+      filterAndSort(
+        selectedScenario?.sections ?? [],
+        sectionQuery,
+        sectionStatus,
+        sectionSort,
+        (section) => `${section.title} ${section.description} ${section.purpose}`,
+        (section) => section.title,
+      ),
+    [selectedScenario, sectionQuery, sectionSort, sectionStatus],
+  );
+  const visibleProducts = useMemo(() => {
+    const products = filterAndSort(
+      selectedSection?.products ?? [],
+      productQuery,
+      productStatus,
+      productSort,
+      (product) =>
+        `${product.title} ${product.retailer} ${product.componentType} ${product.badge}`,
+      (product) => product.title,
+      (product) => product.retailer,
+    );
+    return productRetailer === 'all'
+      ? products
+      : products.filter((product) => product.retailer === productRetailer);
+  }, [
+    productQuery,
+    productRetailer,
+    productSort,
+    productStatus,
+    selectedSection,
+  ]);
+  const canDragScenarios =
+    !scenarioQuery && scenarioStatus === 'all' && scenarioSort === 'order';
+  const canDragSections =
+    !sectionQuery && sectionStatus === 'all' && sectionSort === 'order';
+  const canDragProducts =
+    !productQuery &&
+    productStatus === 'all' &&
+    productRetailer === 'all' &&
+    productSort === 'order';
+  const totalSections = scenarios.reduce(
+    (total, scenario) => total + scenario.sections.length,
+    0,
+  );
+  const totalProducts = scenarios.reduce(
+    (scenarioTotal, scenario) =>
+      scenarioTotal +
+      scenario.sections.reduce(
+        (sectionTotal, section) => sectionTotal + section.products.length,
+        0,
+      ),
+    0,
   );
 
   const selectScenario = (scenario: RecommendationScenarioRecord) => {
@@ -101,6 +185,35 @@ export function AffiliateAdminDashboard({
     } finally {
       setBusy(false);
     }
+  };
+
+  const reorder = async (
+    kind: Exclude<DraggedItem, null>['kind'],
+    draggedId: string,
+    targetId: string,
+  ) => {
+    if (draggedId === targetId) return;
+
+    const items =
+      kind === 'scenario'
+        ? scenarios
+        : kind === 'section'
+          ? selectedScenario?.sections ?? []
+          : selectedSection?.products ?? [];
+    const orderedIds = moveIdBefore(
+      items.map((item) => item.id),
+      draggedId,
+      targetId,
+    );
+    const url =
+      kind === 'scenario'
+        ? `/api/admin/scenarios/${draggedId}`
+        : kind === 'section'
+          ? `/api/admin/sections/${draggedId}`
+          : `/api/admin/affiliate-links/${draggedId}`;
+
+    await request(url, 'PATCH', { action: 'reorder', orderedIds });
+    setDraggedItem(null);
   };
 
   const saveScenario = async (input: ScenarioInput, id?: string) => {
@@ -149,6 +262,12 @@ export function AffiliateAdminDashboard({
           </form>
         </header>
 
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          <AdminMetric label="Scenarios" value={scenarios.length} />
+          <AdminMetric label="Sections" value={totalSections} />
+          <AdminMetric label="Products" value={totalProducts} />
+        </div>
+
         {(notice || error) && (
           <div
             className={`mb-5 rounded-2xl border px-4 py-3 text-sm ${
@@ -179,8 +298,20 @@ export function AffiliateAdminDashboard({
                 Add
               </button>
             </div>
+            <AdminToolbar
+              onQueryChange={setScenarioQuery}
+              onSortChange={setScenarioSort}
+              onStatusChange={setScenarioStatus}
+              query={scenarioQuery}
+              searchLabel="Search scenarios"
+              sort={scenarioSort}
+              sortOptions={baseSortOptions}
+              status={scenarioStatus}
+            />
+            <DragHint enabled={canDragScenarios} />
             <div className="grid max-h-[70vh] gap-2 overflow-y-auto pr-1">
-              {scenarios.map((scenario, index) => {
+              {visibleScenarios.map((scenario) => {
+                const scenarioIndex = scenarios.findIndex((item) => item.id === scenario.id);
                 const productCount = scenario.sections.reduce(
                   (total, section) => total + section.products.length,
                   0,
@@ -191,8 +322,23 @@ export function AffiliateAdminDashboard({
                       selectedScenario?.id === scenario.id
                         ? 'border-violet-400/50 bg-violet-500/10'
                         : 'border-white/10 bg-black/15 hover:border-white/20'
-                    }`}
+                    } ${draggedItem?.id === scenario.id ? 'opacity-45' : ''} ${canDragScenarios ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    draggable={canDragScenarios && !busy}
                     key={scenario.id}
+                    onDragEnd={() => setDraggedItem(null)}
+                    onDragOver={(event) => {
+                      if (canDragScenarios) event.preventDefault();
+                    }}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      setDraggedItem({ kind: 'scenario', id: scenario.id });
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (draggedItem?.kind === 'scenario') {
+                        void reorder('scenario', draggedItem.id, scenario.id);
+                      }
+                    }}
                   >
                     <button
                       className="w-full text-left"
@@ -206,12 +352,12 @@ export function AffiliateAdminDashboard({
                     </button>
                     <div className="mt-2 flex gap-1">
                       <IconButton
-                        disabled={busy || index === 0}
+                        disabled={busy || scenarioIndex === 0}
                         label="Move scenario up"
                         onClick={() => request(`/api/admin/scenarios/${scenario.id}`, 'PATCH', { action: 'move', direction: 'up' })}
                       >↑</IconButton>
                       <IconButton
-                        disabled={busy || index === scenarios.length - 1}
+                        disabled={busy || scenarioIndex === scenarios.length - 1}
                         label="Move scenario down"
                         onClick={() => request(`/api/admin/scenarios/${scenario.id}`, 'PATCH', { action: 'move', direction: 'down' })}
                       >↓</IconButton>
@@ -220,10 +366,21 @@ export function AffiliateAdminDashboard({
                         label={scenario.enabled ? 'Disable scenario' : 'Enable scenario'}
                         onClick={() => request(`/api/admin/scenarios/${scenario.id}`, 'PATCH', { ...toScenarioInput(scenario), enabled: !scenario.enabled })}
                       >{scenario.enabled ? 'On' : 'Off'}</IconButton>
+                      {!scenario.isCore ? (
+                        <IconButton
+                          label="Delete scenario"
+                          onClick={() => confirmAction('Delete this empty scenario?', () => request(`/api/admin/scenarios/${scenario.id}`, 'DELETE'))}
+                        >Delete</IconButton>
+                      ) : null}
                     </div>
                   </div>
                 );
               })}
+              {visibleScenarios.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-slate-500">
+                  No scenarios match these filters.
+                </p>
+              ) : null}
             </div>
           </aside>
 
@@ -259,15 +416,48 @@ export function AffiliateAdminDashboard({
                     </button>
                   </div>
 
+                  <div className="mt-4">
+                    <AdminToolbar
+                      onQueryChange={setSectionQuery}
+                      onSortChange={setSectionSort}
+                      onStatusChange={setSectionStatus}
+                      query={sectionQuery}
+                      searchLabel="Search sections"
+                      sort={sectionSort}
+                      sortOptions={baseSortOptions}
+                      status={sectionStatus}
+                    />
+                    <DragHint enabled={canDragSections} />
+                  </div>
+
                   <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    {selectedScenario.sections.map((section, index) => (
-                      <div
-                        className={`rounded-2xl border p-4 ${
+                    {visibleSections.map((section) => {
+                      const sectionIndex = selectedScenario.sections.findIndex(
+                        (item) => item.id === section.id,
+                      );
+                      return (
+                        <div
+                        className={`rounded-2xl border p-4 transition ${
                           selectedSection?.id === section.id
                             ? 'border-cyan-400/50 bg-cyan-500/10'
                             : 'border-white/10 bg-black/15'
-                        }`}
+                        } ${draggedItem?.id === section.id ? 'opacity-45' : ''} ${canDragSections ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                        draggable={canDragSections && !busy}
                         key={section.id}
+                        onDragEnd={() => setDraggedItem(null)}
+                        onDragOver={(event) => {
+                          if (canDragSections) event.preventDefault();
+                        }}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = 'move';
+                          setDraggedItem({ kind: 'section', id: section.id });
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          if (draggedItem?.kind === 'section') {
+                            void reorder('section', draggedItem.id, section.id);
+                          }
+                        }}
                       >
                         <button className="w-full text-left" onClick={() => setSelectedSectionId(section.id)} type="button">
                           <span className="flex items-center justify-between gap-2">
@@ -280,8 +470,8 @@ export function AffiliateAdminDashboard({
                           </span>
                         </button>
                         <div className="mt-3 flex flex-wrap gap-1">
-                          <IconButton disabled={busy || index === 0} label="Move section up" onClick={() => request(`/api/admin/sections/${section.id}`, 'PATCH', { action: 'move', direction: 'up' })}>↑</IconButton>
-                          <IconButton disabled={busy || index === selectedScenario.sections.length - 1} label="Move section down" onClick={() => request(`/api/admin/sections/${section.id}`, 'PATCH', { action: 'move', direction: 'down' })}>↓</IconButton>
+                          <IconButton disabled={busy || sectionIndex === 0} label="Move section up" onClick={() => request(`/api/admin/sections/${section.id}`, 'PATCH', { action: 'move', direction: 'up' })}>↑</IconButton>
+                          <IconButton disabled={busy || sectionIndex === selectedScenario.sections.length - 1} label="Move section down" onClick={() => request(`/api/admin/sections/${section.id}`, 'PATCH', { action: 'move', direction: 'down' })}>↓</IconButton>
                           <IconButton label="Edit section" onClick={() => setEditor({ kind: 'section', value: section })}>Edit</IconButton>
                           <IconButton label="Duplicate section" onClick={() => request(`/api/admin/sections/${section.id}/duplicate`, 'POST')}>Duplicate</IconButton>
                           <IconButton label={section.enabled ? 'Disable section' : 'Enable section'} onClick={() => request(`/api/admin/sections/${section.id}`, 'PATCH', { ...toSectionInput(section), enabled: !section.enabled })}>{section.enabled ? 'On' : 'Off'}</IconButton>
@@ -289,8 +479,14 @@ export function AffiliateAdminDashboard({
                             <IconButton label="Delete section" onClick={() => confirmAction('Delete this empty section?', () => request(`/api/admin/sections/${section.id}`, 'DELETE'))}>Delete</IconButton>
                           )}
                         </div>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
+                    {visibleSections.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500 md:col-span-2">
+                        No sections match these filters.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -305,23 +501,80 @@ export function AffiliateAdminDashboard({
                       <button className={primaryButton} disabled={busy} onClick={() => setEditor({ kind: 'product', value: null })} type="button">Add product</button>
                     </div>
 
+                    <div className="mt-4">
+                      <AdminToolbar
+                        extra={
+                          <select
+                            aria-label="Filter products by retailer"
+                            className={compactInputClass}
+                            onChange={(event) => setProductRetailer(event.target.value)}
+                            value={productRetailer}
+                          >
+                            <option value="all">All retailers</option>
+                            {AFFILIATE_RETAILERS.map((retailer) => (
+                              <option key={retailer} value={retailer}>{retailer}</option>
+                            ))}
+                          </select>
+                        }
+                        onQueryChange={setProductQuery}
+                        onSortChange={setProductSort}
+                        onStatusChange={setProductStatus}
+                        query={productQuery}
+                        searchLabel="Search products"
+                        sort={productSort}
+                        sortOptions={productSortOptions}
+                        status={productStatus}
+                      />
+                      <DragHint enabled={canDragProducts} />
+                    </div>
+
                     {selectedSection.products.length > 0 ? (
-                      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                        {selectedSection.products.map((product, index) => (
-                          <ProductAdminCard
-                            busy={busy}
-                            index={index}
-                            key={product.id}
-                            onDelete={() => confirmAction('Delete this product from the active recommendation system?', () => request(`/api/admin/affiliate-links/${product.id}`, 'DELETE'))}
-                            onDuplicate={() => request(`/api/admin/affiliate-links/${product.id}/copy`, 'POST', { sectionIds: [product.sectionId] })}
-                            onEdit={() => setEditor({ kind: 'product', value: product })}
-                            onMove={(direction) => request(`/api/admin/affiliate-links/${product.id}`, 'PATCH', { action: 'move', direction })}
-                            onToggle={() => request(`/api/admin/affiliate-links/${product.id}`, 'PATCH', { ...toProductInput(product), enabled: !product.enabled })}
-                            product={product}
-                            total={selectedSection.products.length}
-                          />
-                        ))}
-                      </div>
+                      visibleProducts.length > 0 ? (
+                        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                          {visibleProducts.map((product) => {
+                            const productIndex = selectedSection.products.findIndex(
+                              (item) => item.id === product.id,
+                            );
+                            return (
+                              <div
+                                className={`${draggedItem?.id === product.id ? 'opacity-45' : ''} ${canDragProducts ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                                draggable={canDragProducts && !busy}
+                                key={product.id}
+                                onDragEnd={() => setDraggedItem(null)}
+                                onDragOver={(event) => {
+                                  if (canDragProducts) event.preventDefault();
+                                }}
+                                onDragStart={(event) => {
+                                  event.dataTransfer.effectAllowed = 'move';
+                                  setDraggedItem({ kind: 'product', id: product.id });
+                                }}
+                                onDrop={(event) => {
+                                  event.preventDefault();
+                                  if (draggedItem?.kind === 'product') {
+                                    void reorder('product', draggedItem.id, product.id);
+                                  }
+                                }}
+                              >
+                                <ProductAdminCard
+                                  busy={busy}
+                                  index={productIndex}
+                                  onDelete={() => confirmAction('Delete this product from the active recommendation system?', () => request(`/api/admin/affiliate-links/${product.id}`, 'DELETE'))}
+                                  onDuplicate={() => request(`/api/admin/affiliate-links/${product.id}/copy`, 'POST', { sectionIds: [product.sectionId] })}
+                                  onEdit={() => setEditor({ kind: 'product', value: product })}
+                                  onMove={(direction) => request(`/api/admin/affiliate-links/${product.id}`, 'PATCH', { action: 'move', direction })}
+                                  onToggle={() => request(`/api/admin/affiliate-links/${product.id}`, 'PATCH', { ...toProductInput(product), enabled: !product.enabled })}
+                                  product={product}
+                                  total={selectedSection.products.length}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="mt-5 rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-slate-500">
+                          No products match these filters.
+                        </div>
+                      )
                     ) : (
                       <div className="mt-5 rounded-2xl border border-dashed border-white/15 p-8 text-center text-sm text-slate-500">
                         This section has no products yet. Empty sections are not shown publicly.
@@ -376,20 +629,17 @@ function ProductAdminCard({
   onMove: (direction: 'up' | 'down') => void;
 }) {
   return (
-    <article className="flex min-h-64 flex-col rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="text-[11px] font-black uppercase tracking-[0.14em] text-violet-300">{product.badge}</span>
-          <h4 className="mt-1 font-black">{product.title}</h4>
-          <p className="mt-1 text-xs text-slate-500">{product.retailer} · {getDomain(product.affiliateUrl) || 'Invalid domain'}</p>
-        </div>
-        <span className={product.enabled ? enabledBadge : disabledBadge}>{product.enabled ? 'Enabled' : 'Disabled'}</span>
+    <article className="rounded-3xl border border-white/10 bg-black/20 p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3 px-1">
+        <p className="min-w-0 truncate text-xs text-slate-500">
+          {getDomain(product.affiliateUrl) || 'Invalid domain'}
+        </p>
+        <span className={product.enabled ? enabledBadge : disabledBadge}>
+          {product.enabled ? 'Enabled' : 'Disabled'}
+        </span>
       </div>
-      <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-400">{product.shortDescription}</p>
-      <p className="mt-2 text-sm font-bold text-slate-200">{product.priceText}</p>
-      {product.platform && <p className="mt-1 text-xs text-cyan-300">Platform: {product.platform}</p>}
-      <a className="mt-4 inline-flex w-fit rounded-xl bg-violet-500 px-4 py-2 text-sm font-black text-white" href={product.affiliateUrl} rel="sponsored nofollow noopener noreferrer" target="_blank">{product.buttonText}</a>
-      <div className="mt-auto flex flex-wrap gap-1 pt-4">
+      <RecommendationProductCard preview product={product} />
+      <div className="flex flex-wrap gap-1 px-1 pt-4">
         <IconButton disabled={busy || index === 0} label="Move product up" onClick={() => onMove('up')}>↑</IconButton>
         <IconButton disabled={busy || index === total - 1} label="Move product down" onClick={() => onMove('down')}>↓</IconButton>
         <IconButton label="Edit or move product" onClick={onEdit}>Edit / Move</IconButton>
@@ -458,6 +708,14 @@ function ProductForm({ product, sectionId, sections, busy, onSave }: { product: 
       {draft.platform === 'PC' && <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs text-amber-200">Only enable a PC purchase link after an official PC listing exists.</p>}
       <Check label="Product enabled" onChange={(enabled) => setDraft({ ...draft, enabled })} value={draft.enabled} />
       <p className="text-xs leading-5 text-slate-500">Prices, ratings, reviews, and images are never scraped. Only administrator-entered content is displayed.</p>
+      <section className="rounded-2xl border border-white/10 bg-black/20 p-3 sm:p-4">
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-violet-300">
+          Live card preview
+        </p>
+        <div className="mx-auto max-w-sm">
+          <RecommendationProductCard preview product={draft} />
+        </div>
+      </section>
       <SaveButton busy={busy} />
     </form>
   );
@@ -472,6 +730,118 @@ function EditorModal({ title, children, onClose }: { title: string; children: Re
       </div>
     </div>
   );
+}
+
+function AdminMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function AdminToolbar({
+  query,
+  status,
+  sort,
+  searchLabel,
+  sortOptions,
+  onQueryChange,
+  onStatusChange,
+  onSortChange,
+  extra,
+}: {
+  query: string;
+  status: AvailabilityFilter;
+  sort: AdminSort;
+  searchLabel: string;
+  sortOptions: readonly (readonly [AdminSort, string])[];
+  onQueryChange: (value: string) => void;
+  onStatusChange: (value: AvailabilityFilter) => void;
+  onSortChange: (value: AdminSort) => void;
+  extra?: ReactNode;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(11rem,1fr)_auto_auto_auto]">
+      <input
+        aria-label={searchLabel}
+        className={compactInputClass}
+        onChange={(event) => onQueryChange(event.target.value)}
+        placeholder={searchLabel}
+        type="search"
+        value={query}
+      />
+      <select
+        aria-label="Filter by enabled status"
+        className={compactInputClass}
+        onChange={(event) => onStatusChange(event.target.value as AvailabilityFilter)}
+        value={status}
+      >
+        <option value="all">All statuses</option>
+        <option value="enabled">Enabled</option>
+        <option value="disabled">Disabled</option>
+      </select>
+      {extra}
+      <select
+        aria-label="Sort items"
+        className={compactInputClass}
+        onChange={(event) => onSortChange(event.target.value as AdminSort)}
+        value={sort}
+      >
+        {sortOptions.map(([value, label]) => (
+          <option key={value} value={value}>{label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function DragHint({ enabled }: { enabled: boolean }) {
+  return (
+    <p className="mt-2 text-[10px] leading-4 text-slate-600">
+      {enabled
+        ? 'Drag cards to change the saved display order.'
+        : 'Clear filters and choose Display order to enable drag ordering.'}
+    </p>
+  );
+}
+
+function filterAndSort<T extends { enabled: boolean; displayOrder: number }>(
+  items: readonly T[],
+  query: string,
+  status: AvailabilityFilter,
+  sort: AdminSort,
+  searchableText: (item: T) => string,
+  title: (item: T) => string,
+  retailer: (item: T) => string = () => '',
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+  return items
+    .filter((item) => {
+      if (status === 'enabled' && !item.enabled) return false;
+      if (status === 'disabled' && item.enabled) return false;
+      return !normalizedQuery || searchableText(item).toLowerCase().includes(normalizedQuery);
+    })
+    .slice()
+    .sort((left, right) => {
+      if (sort === 'title') return title(left).localeCompare(title(right));
+      if (sort === 'retailer') {
+        return retailer(left).localeCompare(retailer(right)) || title(left).localeCompare(title(right));
+      }
+      if (sort === 'status') {
+        return Number(right.enabled) - Number(left.enabled) || title(left).localeCompare(title(right));
+      }
+      return left.displayOrder - right.displayOrder;
+    });
+}
+
+function moveIdBefore(ids: string[], draggedId: string, targetId: string) {
+  const next = ids.filter((id) => id !== draggedId);
+  const targetIndex = next.indexOf(targetId);
+  if (targetIndex === -1) return ids;
+  next.splice(targetIndex, 0, draggedId);
+  return next;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}</label>; }
@@ -490,8 +860,18 @@ function getDomain(value: string) { try { return new URL(value).hostname.toLower
 function confirmAction(message: string, action: () => void) { if (window.confirm(message)) action(); }
 
 const inputClass = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-400/60 disabled:opacity-50';
+const compactInputClass = 'min-w-0 rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-violet-400/60';
 const primaryButton = 'rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-black text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50';
 const secondaryButton = 'rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/10';
 const smallButton = 'rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-black text-white disabled:opacity-50';
 const enabledBadge = 'rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300';
 const disabledBadge = 'rounded-full bg-slate-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-400';
+const baseSortOptions = [
+  ['order', 'Display order'],
+  ['title', 'Title A–Z'],
+  ['status', 'Enabled first'],
+] as const satisfies readonly (readonly [AdminSort, string])[];
+const productSortOptions = [
+  ...baseSortOptions,
+  ['retailer', 'Retailer A–Z'],
+] as const satisfies readonly (readonly [AdminSort, string])[];

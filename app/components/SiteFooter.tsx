@@ -11,6 +11,14 @@ export function SiteFooter() {
         <Link href="/affiliate-disclosure" className="font-semibold text-cyan-300 hover:text-cyan-200">
           Affiliate Disclosure
         </Link>
+        <span aria-hidden="true">•</span>
+        <Link href="/privacy" className="font-semibold text-cyan-300 hover:text-cyan-200">
+          Privacy
+        </Link>
+        <span aria-hidden="true">•</span>
+        <Link href="/terms" className="font-semibold text-cyan-300 hover:text-cyan-200">
+          Terms
+        </Link>
       </p>
     </footer>
   );

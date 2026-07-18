@@ -48,7 +48,7 @@ const SCREENSHOT_UPLOAD_COPY = {
   inputLabel: 'Upload a screenshot of your system specs',
   manualEntryButton: '\u2699\uFE0F Enter Specs Manually',
   manualEntryLabel: 'Enter your PC specs manually',
-  scannerButton: '\u2B07\uFE0F Download Scanner (Beta)',
+  scannerButton: '\u2B07\uFE0F Automatic PC scanner coming soon.',
   scannerLabel: 'Download PC scanner tool in beta',
   previewAlt: 'Screenshot preview for system specs upload',
   fileTypeError: 'Please upload a PNG, JPG, JPEG, or WEBP image.',

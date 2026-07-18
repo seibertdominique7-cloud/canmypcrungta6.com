@@ -20,7 +20,6 @@ import type {
   ScenarioInput,
 } from './affiliate-validation';
 import { isPublicHttpsUrl } from './affiliate-validation';
-import { isPassingRecommendationScenario } from './monetization-policy';
 import { prisma } from './prisma';
 
 type SectionWithProducts = RecommendationSection & { products: AffiliateProduct[] };
@@ -110,10 +109,7 @@ export async function getPublicMonetization(
     return null;
   }
 
-  const allowPurchase = isPassingRecommendationScenario(code);
-  const matchingSections = scenario.sections.filter(
-    (section) => allowPurchase || section.purpose !== 'GAME_PURCHASE',
-  );
+  const matchingSections = scenario.sections;
   const enabledSections = matchingSections.filter((section) => section.enabled);
   const disabledSections = matchingSections
     .filter((section) => !section.enabled)
@@ -269,6 +265,29 @@ export async function moveScenario(id: string, direction: 'up' | 'down') {
 
 }
 
+export async function reorderScenarios(anchorId: string, orderedIds: string[]) {
+  const anchor = await prisma.recommendationScenario.findFirst({
+    where: { id: anchorId, groupType: 'SCENARIO' },
+    select: { id: true },
+  });
+  if (!anchor) throw new AdminDataError('Scenario does not exist.', 404);
+
+  const siblings = await prisma.recommendationScenario.findMany({
+    where: { groupType: 'SCENARIO' },
+    select: { id: true },
+  });
+  assertCompleteOrder(siblings.map((item) => item.id), orderedIds);
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.recommendationScenario.update({
+        where: { id },
+        data: { displayOrder: (index + 1) * 10 },
+      }),
+    ),
+  );
+}
+
 export async function createRecommendationSection(input: RecommendationSectionInput) {
   await assertScenarioExists(input.scenarioId);
   const displayOrder = await nextSectionDisplayOrder(input.scenarioId);
@@ -338,6 +357,29 @@ export async function moveRecommendationSection(id: string, direction: 'up' | 'd
       data: { displayOrder: current.displayOrder },
     }),
   ]);
+}
+
+export async function reorderRecommendationSections(anchorId: string, orderedIds: string[]) {
+  const anchor = await prisma.recommendationSection.findUnique({
+    where: { id: anchorId },
+    select: { scenarioId: true },
+  });
+  if (!anchor) throw new AdminDataError('Section does not exist.', 404);
+
+  const siblings = await prisma.recommendationSection.findMany({
+    where: { scenarioId: anchor.scenarioId },
+    select: { id: true },
+  });
+  assertCompleteOrder(siblings.map((item) => item.id), orderedIds);
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.recommendationSection.update({
+        where: { id },
+        data: { displayOrder: (index + 1) * 10 },
+      }),
+    ),
+  );
 }
 
 export async function duplicateRecommendationSection(id: string) {
@@ -438,6 +480,29 @@ export async function moveAffiliateLink(id: string, direction: 'up' | 'down') {
       data: { displayOrder: current.displayOrder },
     }),
   ]);
+}
+
+export async function reorderAffiliateLinks(anchorId: string, orderedIds: string[]) {
+  const anchor = await prisma.affiliateProduct.findUnique({
+    where: { id: anchorId },
+    select: { sectionId: true },
+  });
+  if (!anchor) throw new AdminDataError('Product does not exist.', 404);
+
+  const siblings = await prisma.affiliateProduct.findMany({
+    where: { sectionId: anchor.sectionId },
+    select: { id: true },
+  });
+  assertCompleteOrder(siblings.map((item) => item.id), orderedIds);
+
+  await prisma.$transaction(
+    orderedIds.map((id, index) =>
+      prisma.affiliateProduct.update({
+        where: { id },
+        data: { displayOrder: (index + 1) * 10 },
+      }),
+    ),
+  );
 }
 
 export async function copyAffiliateLink(id: string, sectionIds: string[]) {
@@ -570,6 +635,20 @@ async function nextProductDisplayOrder(sectionId: string) {
     _max: { displayOrder: true },
   });
   return (maximum._max.displayOrder ?? 0) + 10;
+}
+
+function assertCompleteOrder(actualIds: string[], orderedIds: string[]) {
+  if (orderedIds.length > 500 || new Set(orderedIds).size !== orderedIds.length) {
+    throw new AdminDataError('The requested display order is invalid.', 400);
+  }
+
+  const actual = new Set(actualIds);
+  const containsEverySibling =
+    actualIds.length === orderedIds.length && orderedIds.every((id) => actual.has(id));
+
+  if (!containsEverySibling) {
+    throw new AdminDataError('The display order must include every item in this group.', 400);
+  }
 }
 
 async function syncLegacyGamePurchaseLink(link: GamePurchaseLink) {
