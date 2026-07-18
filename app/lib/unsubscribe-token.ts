@@ -68,7 +68,7 @@ function sign(value: string) {
 
 function getSecret() {
   return process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() ||
-    process.env.ADMIN_SESSION_SECRET?.trim() ||
+    process.env.SESSION_SECRET?.trim() ||
     null;
 }
 

@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 
 const ADMIN_COOKIE_NAME = 'gta6_admin_session';
 const ADMIN_SESSION_SECONDS = 60 * 60 * 12;
+const MINIMUM_SESSION_SECRET_LENGTH = 32;
 
 interface AdminSessionPayload {
   version: 1;
@@ -15,11 +16,17 @@ interface AdminSessionPayload {
 
 export function getAdminConfigurationError() {
   if (!process.env.ADMIN_PASSWORD) {
-    return 'ADMIN_PASSWORD is not configured.';
+    return getMissingVariableMessage('ADMIN_PASSWORD');
   }
 
-  if (!process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET.length < 32) {
-    return 'ADMIN_SESSION_SECRET must contain at least 32 characters.';
+  const sessionSecret = process.env.SESSION_SECRET?.trim();
+
+  if (!sessionSecret) {
+    return getMissingVariableMessage('SESSION_SECRET');
+  }
+
+  if (sessionSecret.length < MINIMUM_SESSION_SECRET_LENGTH) {
+    return `SESSION_SECRET must contain at least ${MINIMUM_SESSION_SECRET_LENGTH} characters.`;
   }
 
   return null;
@@ -128,10 +135,21 @@ function verifySessionToken(token: string) {
 }
 
 function sign(value: string) {
-  const password = process.env.ADMIN_PASSWORD ?? '';
-  const sessionSecret = process.env.ADMIN_SESSION_SECRET ?? '';
+  const password = process.env.ADMIN_PASSWORD;
+  const sessionSecret = process.env.SESSION_SECRET?.trim();
+
+  if (!password || !sessionSecret || sessionSecret.length < MINIMUM_SESSION_SECRET_LENGTH) {
+    throw new Error('Admin authentication is not configured securely.');
+  }
+
   const signingKey = createHmac('sha256', sessionSecret).update(password).digest();
   return createHmac('sha256', signingKey).update(value).digest('base64url');
+}
+
+function getMissingVariableMessage(variableName: 'ADMIN_PASSWORD' | 'SESSION_SECRET') {
+  return process.env.NODE_ENV === 'production'
+    ? `${variableName} is not configured. Add it to the deployment environment and redeploy.`
+    : `${variableName} is not configured. Add it to .env.local and restart npm run dev.`;
 }
 
 function safeEqual(left: string, right: string) {

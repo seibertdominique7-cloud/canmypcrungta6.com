@@ -6,17 +6,17 @@ registration flows.
 
 ## Environment variables
 
-Copy `.env.example` to `.env`, then replace every example secret:
+Copy `.env.example` to `.env.local`, then replace every example secret:
 
 ```dotenv
 DATABASE_URL="file:./dev.db"
 ADMIN_PASSWORD="use-a-unique-long-password"
-ADMIN_SESSION_SECRET="use-at-least-32-random-characters"
+SESSION_SECRET="use-at-least-32-random-characters"
 AFFILIATE_RECOMMENDATION_LIMIT="3"
 ```
 
 - `ADMIN_PASSWORD` is the owner password. It is read only by server code.
-- `ADMIN_SESSION_SECRET` signs sessions and must be at least 32 characters. Changing either secret
+- `SESSION_SECRET` signs sessions and must be at least 32 characters. Changing either secret
   immediately invalidates existing sessions.
 - `AFFILIATE_RECOMMENDATION_LIMIT` is retained for backward compatibility with the legacy
   `/api/recommendations` response. Each editable section now controls its own product limit.

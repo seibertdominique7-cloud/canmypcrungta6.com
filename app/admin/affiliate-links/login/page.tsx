@@ -54,8 +54,7 @@ export default async function AffiliateAdminLoginPage({
               name="password"
               required
               autoComplete="current-password"
-              disabled={Boolean(configurationError)}
-              className="theme-input rounded-lg px-4 py-3 font-normal disabled:opacity-50"
+              className="theme-input rounded-lg px-4 py-3 font-normal"
             />
           </label>
           <button
