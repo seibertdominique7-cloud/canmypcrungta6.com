@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model RecommendationScenario {
+  id                   String                  @id @default(cuid())
+  code                 String                  @unique
+  displayName          String
+  resultHeading        String                  @map("heading")
+  resultDescription    String                  @map("description")
+  enabled              Boolean                 @default(true)
+  displayOrder         Int
+  isCore               Boolean                 @default(false)
+  groupType            String                  @default("SCENARIO")
+  sections             RecommendationSection[]
+  legacyAffiliateLinks LegacyAffiliateLink[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([groupType, enabled, displayOrder])
+}
+
+model RecommendationSection {
+  id                 String                 @id @default(cuid())
+  scenarioId         String
+  scenario           RecommendationScenario @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  title              String
+  description        String
+  enabled            Boolean                @default(true)
+  displayOrder       Int
+  maxProducts        Int                    @default(3)
+  collapsedByDefault Boolean                @default(false)
+  layout             String                 @default("grid")
+  purpose            String                 @default("GENERAL")
+  isCore             Boolean                @default(false)
+  products           AffiliateProduct[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([scenarioId, enabled, displayOrder])
+}
+
+model AffiliateProduct {
+  id               String                @id @default(cuid())
+  sectionId        String
+  section          RecommendationSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  title            String
+  retailer         String
+  affiliateUrl     String
+  imageUrl         String?
+  priceText        String
+  shortDescription String
+  badge            String
+  buttonText       String
+  componentType    String
+  platform         String?
+  enabled          Boolean               @default(true)
+  displayOrder     Int
+  legacySourceType String?
+  legacySourceId   String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@unique([legacySourceType, legacySourceId, sectionId])
+  @@index([sectionId, enabled, displayOrder])
+}
+
+// Retained as a migration/rollback source so no existing affiliate records are
+// dropped. New admin and public writes use AffiliateProduct above.
+model LegacyAffiliateLink {
+  id               String                 @id @default(cuid())
+  title            String
+  retailer         String
+  affiliateUrl     String
+  imageUrl         String?
+  priceText        String
+  badge            String
+  shortDescription String
+  buttonText       String
+  componentType    String
+  enabled          Boolean                @default(true)
+  displayOrder     Int
+  scenarioId       String
+  scenario         RecommendationScenario @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([scenarioId, enabled, displayOrder])
+  @@map("AffiliateLink")
+}
+
+model GamePurchaseLink {
+  id            String   @id @default(cuid())
+  enabled       Boolean  @default(false)
+  title         String
+  description   String
+  platform      String
+  retailer      String
+  affiliateUrl  String
+  buttonText    String
+  imageUrl      String?
+  releaseStatus String
+  displayOrder  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([enabled, displayOrder])
+}

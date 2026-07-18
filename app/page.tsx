@@ -66,18 +66,6 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 w-full border-t border-slate-800 bg-slate-950/50 py-8 text-center text-sm text-slate-400">
-        <p>
-          Made for gaming enthusiasts
-          {' \u2022 '}
-          Stay tuned for GTA VI
-          {' \u2022 '}
-          <a href="#privacy" className="text-blue-400 hover:text-blue-300 ml-1">
-            Privacy Policy
-          </a>
-        </p>
-      </footer>
     </div>
   );
 }

@@ -1,4 +1,11 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GTA VI PC Checker
+
+The app supports screenshot OCR and manual PC-spec entry through one shared compatibility engine.
+It also includes a private recommendation manager organized as compatibility scenario → editable
+section → affiliate product.
+
+See [ADMIN_SETUP.md](./ADMIN_SETUP.md) for database, environment, seed, deployment, and admin-login
+instructions.
 
 ## Getting Started
 

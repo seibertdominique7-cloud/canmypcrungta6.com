@@ -1,16 +1,14 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 
+import { AffiliateRecommendations } from './AffiliateRecommendations';
 import {
-  getRecommendedRequirements,
   getRequirementDisclaimer,
   getRequirementLabel,
   getRequirementLastUpdated,
 } from '../data/gta6-requirements';
 import type { ComponentStatus, CompatibilityResult } from '../lib/compatibility';
-
-const recommendedRequirements = getRecommendedRequirements();
 
 interface CompatibilityResultsProps {
   result: CompatibilityResult;
@@ -20,6 +18,8 @@ interface CompatibilityResultsProps {
   title: string;
   allowStorageQuickEdit?: boolean;
   sectionId?: string;
+  actions?: ReactNode;
+  advancedDetails?: ReactNode;
 }
 
 export function CompatibilityResults({
@@ -30,6 +30,8 @@ export function CompatibilityResults({
   title,
   allowStorageQuickEdit = true,
   sectionId = 'analysis-results',
+  actions,
+  advancedDetails,
 }: CompatibilityResultsProps) {
   const [isStorageEditorOpen, setIsStorageEditorOpen] = useState(false);
   const [storageCapacityDraft, setStorageCapacityDraft] = useState(storageValue);
@@ -85,8 +87,6 @@ export function CompatibilityResults({
       symbol: '?',
     },
   }[result.overall.status];
-  const upgrades = result.components.filter((component) => component.status === 'below');
-
   return (
     <section id={sectionId} className="scroll-mt-4 text-left">
       <div className={`border-b bg-gradient-to-br px-5 py-6 sm:px-7 ${overallStyle.border} ${overallStyle.background}`}>
@@ -187,24 +187,11 @@ export function CompatibilityResults({
         ))}
       </div>
 
-      {upgrades.length > 0 ? (
-        <div className="border-t border-slate-700/60 bg-slate-950/25 px-4 py-4 sm:px-6">
-          <h3 className="text-sm font-bold text-white">Recommended upgrades</h3>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {upgrades.map((component) => (
-              <div
-                key={component.key}
-                className="rounded-lg border border-rose-400/20 bg-rose-500/5 px-3 py-2.5"
-              >
-                <div className="text-sm font-bold text-rose-200">Upgrade {component.label}</div>
-                <div className="mt-0.5 text-xs leading-relaxed text-slate-300">
-                  {getUpgradeRecommendation(component.key)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <AffiliateRecommendations result={result} />
+
+      {actions ? <div className="border-t border-slate-700/50 p-4 sm:px-6">{actions}</div> : null}
+
+      {advancedDetails}
 
       <div className="border-t border-slate-700/50 px-4 py-3 sm:px-6">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -241,24 +228,4 @@ function StatusBadge({ status, label }: StatusBadgeProps) {
       {label}
     </span>
   );
-}
-
-function getUpgradeRecommendation(key: CompatibilityResult['components'][number]['key']) {
-  if (key === 'cpu') {
-    return `${recommendedRequirements.cpu.intel} or ${recommendedRequirements.cpu.amd} recommended.`;
-  }
-
-  if (key === 'gpu') {
-    return `${recommendedRequirements.gpu.nvidia} or ${recommendedRequirements.gpu.amd} recommended.`;
-  }
-
-  if (key === 'ram') {
-    return `${recommendedRequirements.ramGb} GB RAM recommended.`;
-  }
-
-  if (key === 'storage') {
-    return `${recommendedRequirements.storageGb} GB or more free storage and ${recommendedRequirements.storageType} recommended.`;
-  }
-
-  return `${recommendedRequirements.operatingSystem} recommended.`;
 }

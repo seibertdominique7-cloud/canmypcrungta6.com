@@ -104,67 +104,7 @@ export function ManualEntryWorkflow() {
             onChange={updateSpec}
             onSubmit={handleSubmit}
           />
-        ) : (
-          <section className="rounded-2xl border border-slate-700/50 bg-slate-800/40 p-5 shadow-2xl shadow-blue-500/10 backdrop-blur-md sm:p-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Checked specs
-                </p>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-white">
-                  Review or edit your specs
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-                  Edit Specs reopens the form. The result updates immediately when you change a field.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  className="rounded-lg border border-slate-500 px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-300 hover:bg-slate-700/40"
-                  onClick={handleEditSpecs}
-                >
-                  Edit Specs
-                </button>
-                <button
-                  type="button"
-                  className="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
-                  onClick={handleReset}
-                >
-                  Check Another PC
-                </button>
-              </div>
-            </div>
-
-            <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              {[
-                ['CPU', specs.cpu],
-                ['GPU', specs.gpu],
-                ['RAM', specs.ram],
-                ['Storage', formatStorageSummary(specs.storage, specs.storageType)],
-                ['Windows', specs.windowsVersion],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-slate-700/60 bg-slate-950/30 px-4 py-3"
-                >
-                  <dt className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                    {label}
-                  </dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-100">
-                    {value || 'Unknown'}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <p className="mt-4 text-xs leading-relaxed text-slate-500">
-              Storage can stay unknown. If you know it later, enter both the capacity and the drive
-              type.
-            </p>
-          </section>
-        )}
+        ) : null}
 
         {hasChecked ? (
           <CompatibilityResults
@@ -182,14 +122,27 @@ export function ManualEntryWorkflow() {
             title={MANUAL_RESULTS_TITLE}
             allowStorageQuickEdit={false}
             sectionId="manual-results"
+            actions={
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className="flex-1 rounded-lg border border-slate-500 px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-300 hover:bg-slate-700/40"
+                  onClick={handleEditSpecs}
+                >
+                  Edit Specs
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                  onClick={handleReset}
+                >
+                  Check Another PC
+                </button>
+              </div>
+            }
           />
         ) : null}
       </div>
     </section>
   );
-}
-
-function formatStorageSummary(storage: string, storageType: string) {
-  const parts = [storage.trim(), storageType.trim()].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : 'Unknown';
 }
