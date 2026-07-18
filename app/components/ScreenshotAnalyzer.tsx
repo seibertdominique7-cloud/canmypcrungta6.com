@@ -70,8 +70,6 @@ const SCREENSHOT_UPLOAD_COPY = {
     'We could not detect enough useful hardware text. Upload a clearer screenshot or use manual entry.',
   ocrError:
     'We could not read text from this screenshot. Please try a clearer image or check your connection.',
-  disclaimer:
-    'GTA VI PC requirements are estimated until Rockstar publishes official requirements. This check does not guarantee performance.',
 } as const;
 
 export function ScreenshotAnalyzer() {
@@ -571,7 +569,6 @@ function ScreenshotUploadPanel({
                 storageType={editableSpecs.storageType}
                 onStorageSave={onStorageSave}
                 title={SCREENSHOT_UPLOAD_COPY.resultsTitle}
-                disclaimer={SCREENSHOT_UPLOAD_COPY.disclaimer}
                 allowStorageQuickEdit
               />
 

@@ -1,4 +1,14 @@
-import { gtaViRequirements, type RequirementProfile } from './gta6-requirements';
+import {
+  getMinimumRequirements,
+  getRecommendedRequirements,
+  getRequirementStatusAdjective,
+  type StorageType,
+} from '../data/gta6-requirements';
+import {
+  resolveCpuModel,
+  resolveGpuModel,
+  type HardwareTierMatch,
+} from './hardware-ranking';
 import {
   type DetectedHardwareSpecs,
   type EditableHardwareSpecs,
@@ -36,11 +46,6 @@ export interface CompatibilityResult {
   uncertainInfo: string[];
 }
 
-interface HardwareRank {
-  vendor: 'intel' | 'amd' | 'nvidia';
-  score: number;
-}
-
 const STATUS_LABELS: Record<ComponentStatus, string> = {
   recommended: 'Recommended',
   minimum: 'Minimum',
@@ -65,26 +70,32 @@ const REQUIRED_RESULT_FIELDS: Array<{ key: HardwareFieldKey; label: string }> = 
 ];
 
 const DETERMINING_COMPONENT_KEYS: CompatibilityComponentKey[] = ['cpu', 'gpu', 'ram'];
-
-const MINIMUM_CPU_RANKS = {
-  intel: rankCpu(gtaViRequirements.minimum.cpu.intel ?? ''),
-  amd: rankCpu(gtaViRequirements.minimum.cpu.amd ?? ''),
+const minimumRequirements = getMinimumRequirements();
+const recommendedRequirements = getRecommendedRequirements();
+const requirementStatusAdjective = getRequirementStatusAdjective();
+const requirementStatusWord = requirementStatusAdjective.toLowerCase();
+const STORAGE_TYPE_TIERS: Record<StorageType, number> = {
+  HDD: 1,
+  SSD: 2,
+  'NVMe SSD': 3,
 };
 
-const RECOMMENDED_CPU_RANKS = {
-  intel: rankCpu(gtaViRequirements.recommended.cpu.intel ?? ''),
-  amd: rankCpu(gtaViRequirements.recommended.cpu.amd ?? ''),
-};
-
-const MINIMUM_GPU_RANKS = {
-  nvidia: rankGpu(gtaViRequirements.minimum.gpu.nvidia ?? ''),
-  amd: rankGpu(gtaViRequirements.minimum.gpu.amd ?? ''),
-};
-
-const RECOMMENDED_GPU_RANKS = {
-  nvidia: rankGpu(gtaViRequirements.recommended.gpu.nvidia ?? ''),
-  amd: rankGpu(gtaViRequirements.recommended.gpu.amd ?? ''),
-};
+const MINIMUM_CPU_TIER = requirementTier(
+  [minimumRequirements.cpu.intel, minimumRequirements.cpu.amd],
+  resolveCpuModel,
+);
+const RECOMMENDED_CPU_TIER = requirementTier(
+  [recommendedRequirements.cpu.intel, recommendedRequirements.cpu.amd],
+  resolveCpuModel,
+);
+const MINIMUM_GPU_TIER = requirementTier(
+  [minimumRequirements.gpu.nvidia, minimumRequirements.gpu.amd],
+  resolveGpuModel,
+);
+const RECOMMENDED_GPU_TIER = requirementTier(
+  [recommendedRequirements.gpu.nvidia, recommendedRequirements.gpu.amd],
+  resolveGpuModel,
+);
 
 export function evaluateCompatibility(
   specs: EditableHardwareSpecs,
@@ -114,52 +125,62 @@ export function hasEditableSpecs(specs: EditableHardwareSpecs) {
 
 function evaluateCpu(value: string): ComponentCompatibility {
   const detected = value.trim();
-  const rank = rankCpu(detected);
+  const match = resolveCpuModel(detected);
 
-  if (!detected || !rank) {
-    return component('cpu', detected, 'unknown', 'Enter an Intel Core i-series or AMD Ryzen desktop CPU.');
+  if (!detected) {
+    return component('cpu', detected, 'unknown', 'Enter an Intel Core i-series or AMD Ryzen CPU.');
   }
 
-  return compareRankedComponent({
+  if (!match) {
+    return component(
+      'cpu',
+      detected,
+      'unknown',
+      'This exact CPU model is not in the hardware catalog. Check or edit the detected name.',
+    );
+  }
+
+  return compareTieredComponent({
     key: 'cpu',
     detected,
-    rank,
-    minimumRanks: MINIMUM_CPU_RANKS,
-    recommendedRanks: RECOMMENDED_CPU_RANKS,
-    minimumDetail: requirementPair(gtaViRequirements.minimum.cpu.intel, gtaViRequirements.minimum.cpu.amd),
+    match,
+    minimumTier: MINIMUM_CPU_TIER,
+    recommendedTier: RECOMMENDED_CPU_TIER,
+    minimumDetail: requirementPair(minimumRequirements.cpu.intel, minimumRequirements.cpu.amd),
     recommendedDetail: requirementPair(
-      gtaViRequirements.recommended.cpu.intel,
-      gtaViRequirements.recommended.cpu.amd,
+      recommendedRequirements.cpu.intel,
+      recommendedRequirements.cpu.amd,
     ),
   });
 }
 
 function evaluateGpu(value: string): ComponentCompatibility {
   const detected = value.trim();
-  const rank = rankGpu(detected);
+  const match = resolveGpuModel(detected);
 
   if (!detected) {
     return component('gpu', detected, 'unknown', 'Enter an NVIDIA GeForce/RTX/GTX or AMD Radeon RX GPU.');
   }
 
-  if (!rank) {
-    if (looksLikeIntegratedGraphics(detected)) {
-      return component('gpu', detected, 'below', 'Integrated graphics are below the estimated minimum.');
-    }
-
-    return component('gpu', detected, 'unknown', 'GPU model could not be ranked from this text.');
+  if (!match) {
+    return component(
+      'gpu',
+      detected,
+      'unknown',
+      'This exact GPU model is not in the hardware catalog. Check or edit the detected name.',
+    );
   }
 
-  return compareRankedComponent({
+  return compareTieredComponent({
     key: 'gpu',
     detected,
-    rank,
-    minimumRanks: MINIMUM_GPU_RANKS,
-    recommendedRanks: RECOMMENDED_GPU_RANKS,
-    minimumDetail: requirementPair(gtaViRequirements.minimum.gpu.nvidia, gtaViRequirements.minimum.gpu.amd),
+    match,
+    minimumTier: MINIMUM_GPU_TIER,
+    recommendedTier: RECOMMENDED_GPU_TIER,
+    minimumDetail: requirementPair(minimumRequirements.gpu.nvidia, minimumRequirements.gpu.amd),
     recommendedDetail: requirementPair(
-      gtaViRequirements.recommended.gpu.nvidia,
-      gtaViRequirements.recommended.gpu.amd,
+      recommendedRequirements.gpu.nvidia,
+      recommendedRequirements.gpu.amd,
     ),
   });
 }
@@ -172,15 +193,15 @@ function evaluateRam(value: string): ComponentCompatibility {
     return component('ram', detected, 'unknown', 'Enter RAM capacity in GB.');
   }
 
-  if (gb >= gtaViRequirements.recommended.ramGb) {
-    return component('ram', detected, 'recommended', `Estimated recommended: ${gtaViRequirements.recommended.ramGb} GB.`);
+  if (gb >= recommendedRequirements.ramGb) {
+    return component('ram', detected, 'recommended', `${requirementStatusAdjective} recommended: ${recommendedRequirements.ramGb} GB.`);
   }
 
-  if (gb >= gtaViRequirements.minimum.ramGb) {
-    return component('ram', detected, 'minimum', `Estimated minimum: ${gtaViRequirements.minimum.ramGb} GB.`);
+  if (gb >= minimumRequirements.ramGb) {
+    return component('ram', detected, 'minimum', `${requirementStatusAdjective} minimum: ${minimumRequirements.ramGb} GB.`);
   }
 
-  return component('ram', detected, 'below', `Estimated minimum: ${gtaViRequirements.minimum.ramGb} GB.`);
+  return component('ram', detected, 'below', `${requirementStatusAdjective} minimum: ${minimumRequirements.ramGb} GB.`);
 }
 
 function evaluateStorage(value: string, explicitStorageType: string): ComponentCompatibility {
@@ -198,25 +219,41 @@ function evaluateStorage(value: string, explicitStorageType: string): ComponentC
     );
   }
 
-  if (gb < gtaViRequirements.minimum.storageGb) {
+  if (gb < minimumRequirements.storageGb) {
     return component(
       'storage',
       detected,
       'below',
-      `Estimated minimum: ${gtaViRequirements.minimum.storageGb} GB free space.`,
+      `${requirementStatusAdjective} minimum: ${minimumRequirements.storageGb} GB free space.`,
     );
   }
 
   const storageType = detectStorageKind(`${capacity} ${storageTypeText}`);
-  const status: ComponentStatus = storageType === 'nvme' ? 'recommended' : 'minimum';
+  const minimumStorageTypeTier = STORAGE_TYPE_TIERS[minimumRequirements.storageType];
+
+  if (storageType && STORAGE_TYPE_TIERS[storageType] < minimumStorageTypeTier) {
+    return component(
+      'storage',
+      detected,
+      'below',
+      `${requirementStatusAdjective} minimum storage type: ${minimumRequirements.storageType}.`,
+    );
+  }
+
+  const meetsRecommendedCapacity = gb >= recommendedRequirements.storageGb;
+  const meetsRecommendedType =
+    storageType !== null &&
+    STORAGE_TYPE_TIERS[storageType] >= STORAGE_TYPE_TIERS[recommendedRequirements.storageType];
+  const status: ComponentStatus =
+    meetsRecommendedCapacity && meetsRecommendedType ? 'recommended' : 'minimum';
 
   return component(
     'storage',
     detected,
     status,
-    storageType === 'nvme'
-      ? 'Meets the estimated capacity and NVMe recommendation.'
-      : 'Meets the estimated capacity requirement.',
+    status === 'recommended'
+      ? `Meets the ${requirementStatusWord} capacity and ${recommendedRequirements.storageType} recommendation.`
+      : `Meets the ${requirementStatusWord} minimum of ${minimumRequirements.storageGb} GB and ${minimumRequirements.storageType}.`,
   );
 }
 
@@ -235,55 +272,78 @@ function formatDetectedStorage(capacity: string, storageType: string) {
 function evaluateWindowsVersion(value: string): ComponentCompatibility {
   const detected = value.trim();
   const version = parseWindowsVersion(detected);
+  const minimumVersion = parseWindowsVersion(minimumRequirements.operatingSystem);
+  const recommendedVersion = parseWindowsVersion(recommendedRequirements.operatingSystem);
 
   if (!detected || version === null) {
-    return component('windowsVersion', detected, 'unknown', 'Enter Windows 10 or Windows 11.');
+    return component(
+      'windowsVersion',
+      detected,
+      'unknown',
+      `Enter ${minimumRequirements.operatingSystem} or ${recommendedRequirements.operatingSystem}.`,
+    );
   }
 
-  if (version >= 11) {
-    return component('windowsVersion', detected, 'recommended', 'Estimated recommended: Windows 11.');
+  if (minimumVersion === null || recommendedVersion === null) {
+    return component('windowsVersion', detected, 'unknown', 'The Windows requirement is invalid.');
   }
 
-  if (version >= 10) {
-    return component('windowsVersion', detected, 'minimum', 'Estimated minimum: Windows 10.');
+  if (version >= recommendedVersion) {
+    return component(
+      'windowsVersion',
+      detected,
+      'recommended',
+      `${requirementStatusAdjective} recommended: ${recommendedRequirements.operatingSystem}.`,
+    );
   }
 
-  return component('windowsVersion', detected, 'below', 'Estimated minimum: Windows 10.');
+  if (version >= minimumVersion) {
+    return component(
+      'windowsVersion',
+      detected,
+      'minimum',
+      `${requirementStatusAdjective} minimum: ${minimumRequirements.operatingSystem}.`,
+    );
+  }
+
+  return component(
+    'windowsVersion',
+    detected,
+    'below',
+    `${requirementStatusAdjective} minimum: ${minimumRequirements.operatingSystem}.`,
+  );
 }
 
-function compareRankedComponent({
+function compareTieredComponent({
   key,
   detected,
-  rank,
-  minimumRanks,
-  recommendedRanks,
+  match,
+  minimumTier,
+  recommendedTier,
   minimumDetail,
   recommendedDetail,
 }: {
   key: 'cpu' | 'gpu';
   detected: string;
-  rank: HardwareRank;
-  minimumRanks: Partial<Record<HardwareRank['vendor'], HardwareRank | null>>;
-  recommendedRanks: Partial<Record<HardwareRank['vendor'], HardwareRank | null>>;
+  match: HardwareTierMatch;
+  minimumTier: number | null;
+  recommendedTier: number | null;
   minimumDetail: string;
   recommendedDetail: string;
 }) {
-  const minimumRank = minimumRanks[rank.vendor];
-  const recommendedRank = recommendedRanks[rank.vendor];
-
-  if (!minimumRank || !recommendedRank) {
-    return component(key, detected, 'unknown', 'This hardware family is not in the current requirement data.');
+  if (minimumTier === null || recommendedTier === null) {
+    return component(key, detected, 'unknown', 'The requirement hardware is not in the tier catalog.');
   }
 
-  if (rank.score >= recommendedRank.score) {
-    return component(key, detected, 'recommended', `Estimated recommended: ${recommendedDetail}.`);
+  if (match.entry.performanceTier >= recommendedTier) {
+    return component(key, detected, 'recommended', `${requirementStatusAdjective} recommended: ${recommendedDetail}.`);
   }
 
-  if (rank.score >= minimumRank.score) {
-    return component(key, detected, 'minimum', `Estimated minimum: ${minimumDetail}.`);
+  if (match.entry.performanceTier >= minimumTier) {
+    return component(key, detected, 'minimum', `${requirementStatusAdjective} minimum: ${minimumDetail}.`);
   }
 
-  return component(key, detected, 'below', `Estimated minimum: ${minimumDetail}.`);
+  return component(key, detected, 'below', `${requirementStatusAdjective} minimum: ${minimumDetail}.`);
 }
 
 function component(
@@ -320,7 +380,7 @@ function getOverallResult(components: ComponentCompatibility[]): CompatibilityRe
     return {
       status: 'fail',
       title: 'FAIL',
-      description: 'Your PC does not meet the estimated minimum requirements.',
+      description: `Your PC does not meet the ${requirementStatusWord} minimum requirements.`,
     };
   }
 
@@ -330,7 +390,7 @@ function getOverallResult(components: ComponentCompatibility[]): CompatibilityRe
     return {
       status: 'recommended',
       title: 'PASS — Recommended',
-      description: 'Your PC meets or exceeds the estimated recommended requirements.',
+      description: `Your PC meets or exceeds the ${requirementStatusWord} recommended requirements.`,
     };
   }
 
@@ -338,7 +398,7 @@ function getOverallResult(components: ComponentCompatibility[]): CompatibilityRe
     status: 'minimum',
     title: 'PASS — Minimum',
     description:
-      'Your PC meets the estimated minimum requirements but some settings may need to be lowered.',
+      `Your PC meets the ${requirementStatusWord} minimum requirements but some settings may need to be lowered.`,
   };
 }
 
@@ -359,92 +419,21 @@ function getUncertainInfo(detectedSpecs: DetectedHardwareSpecs | null) {
   }).map((field) => `${field.label} needs review`);
 }
 
-function rankCpu(value: string): HardwareRank | null {
-  const normalized = normalizeHardwareText(value);
-  const intel = normalized.match(/\bi\s*([3579])\s*[- ]?\s*(\d{4,5})([a-z]{0,4})\b/i);
+function requirementTier(
+  values: Array<string | undefined>,
+  resolve: (value: string) => HardwareTierMatch | null,
+) {
+  const tiers = values
+    .filter((value): value is string => Boolean(value))
+    .map((value) => resolve(value)?.entry.performanceTier)
+    .filter((tier): tier is number => tier !== undefined);
 
-  if (intel) {
-    const tier = Number.parseInt(intel[1], 10);
-    const model = Number.parseInt(intel[2], 10);
-
-    return {
-      vendor: 'intel',
-      score: getIntelGeneration(model) * 100 + tier * 10 + getCpuSuffixBonus(intel[3]),
-    };
+  if (tiers.length === 0) {
+    return null;
   }
 
-  const amd = normalized.match(/\bRyzen\s*([3579])\s+(\d{4,5})([a-z0-9]{0,4})\b/i);
-
-  if (amd) {
-    const tier = Number.parseInt(amd[1], 10);
-    const model = Number.parseInt(amd[2], 10);
-
-    return {
-      vendor: 'amd',
-      score: Math.floor(model / 1000) * 100 + tier * 10 + getCpuSuffixBonus(amd[3]),
-    };
-  }
-
-  return null;
-}
-
-function rankGpu(value: string): HardwareRank | null {
-  const normalized = normalizeHardwareText(value);
-  const nvidia = normalized.match(/\b(RTX|GTX)\s*(\d{3,4})\s*(Ti|SUPER)?\b/i);
-
-  if (nvidia) {
-    const model = Number.parseInt(nvidia[2], 10);
-    const modifier = nvidia[3] ? 50 : 0;
-
-    return {
-      vendor: 'nvidia',
-      score: model + modifier,
-    };
-  }
-
-  const amd = normalized.match(/\bRX\s*(\d{4})\s*(XT)?\b/i);
-
-  if (amd) {
-    const model = Number.parseInt(amd[1], 10);
-    const modifier = amd[2] ? 50 : 0;
-
-    return {
-      vendor: 'amd',
-      score: model + modifier,
-    };
-  }
-
-  return null;
-}
-
-function normalizeHardwareText(value: string) {
-  return value
-    .replace(/\(R\)|\(TM\)/gi, '')
-    .replace(/\bIntel\s+Core\s+/gi, 'Intel ')
-    .replace(/\bNVIDIA\s+GeForce\s+/gi, 'NVIDIA ')
-    .replace(/\bAMD\s+Radeon\s+/gi, 'AMD ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function getIntelGeneration(model: number) {
-  if (model >= 10000) {
-    return Math.floor(model / 1000);
-  }
-
-  return Math.floor(model / 1000);
-}
-
-function getCpuSuffixBonus(suffix: string | undefined) {
-  if (!suffix) {
-    return 0;
-  }
-
-  if (/x|k/i.test(suffix)) {
-    return 5;
-  }
-
-  return 0;
+  // Requirement alternatives are an OR condition, so the lower calibrated tier is the floor.
+  return Math.min(...tiers);
 }
 
 function parseCapacityGb(value: string) {
@@ -474,15 +463,15 @@ function parseCapacityGb(value: string) {
 
 function detectStorageKind(value: string) {
   if (/\bNVMe\b/i.test(value)) {
-    return 'nvme';
+    return 'NVMe SSD';
   }
 
   if (/\bSSD\b|solid state/i.test(value)) {
-    return 'ssd';
+    return 'SSD';
   }
 
   if (/\bHDD\b|hard disk|hard drive/i.test(value)) {
-    return 'hdd';
+    return 'HDD';
   }
 
   return null;
@@ -498,23 +487,6 @@ function parseWindowsVersion(value: string) {
   return Number.parseInt(match[1], 10);
 }
 
-function looksLikeIntegratedGraphics(value: string) {
-  return /\b(Intel|Iris|UHD|HD Graphics|Vega|Radeon(?:\s+\d{3,4}[A-Z]?)?\s+Graphics|integrated)\b/i.test(
-    value,
-  );
-}
-
 function requirementPair(left: string | undefined, right: string | undefined) {
   return [left, right].filter(Boolean).join(' or ');
-}
-
-export function getRequirementSummary(profile: RequirementProfile) {
-  return {
-    cpu: requirementPair(profile.cpu.intel, profile.cpu.amd),
-    gpu: requirementPair(profile.gpu.nvidia, profile.gpu.amd),
-    ram: `${profile.ramGb} GB`,
-    storage: `${profile.storageGb} GB`,
-    storageType: profile.storageType === 'nvme' ? 'NVMe SSD' : 'HDD allowed',
-    os: profile.os,
-  };
 }

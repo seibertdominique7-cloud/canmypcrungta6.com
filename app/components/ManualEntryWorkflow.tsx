@@ -11,11 +11,7 @@ import {
 } from '../lib/manual-entry';
 import { createEmptyDetectedSpecs, createEmptyEditableSpecs, type EditableHardwareSpecs } from '../lib/hardware-types';
 
-const MANUAL_RESULTS_COPY = {
-  title: 'Can my PC run GTA VI?',
-  disclaimer:
-    'GTA VI PC requirements are estimated until Rockstar publishes official requirements. This check does not guarantee performance.',
-} as const;
+const MANUAL_RESULTS_TITLE = 'Can my PC run GTA VI?';
 
 export function ManualEntryWorkflow() {
   const [specs, setSpecs] = useState<EditableHardwareSpecs>(() => createEmptyEditableSpecs());
@@ -183,8 +179,7 @@ export function ManualEntryWorkflow() {
               }));
               return true;
             }}
-            title={MANUAL_RESULTS_COPY.title}
-            disclaimer={MANUAL_RESULTS_COPY.disclaimer}
+            title={MANUAL_RESULTS_TITLE}
             allowStorageQuickEdit={false}
             sectionId="manual-results"
           />

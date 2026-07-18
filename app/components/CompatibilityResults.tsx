@@ -2,8 +2,15 @@
 
 import { type FormEvent, useState } from 'react';
 
-import { gtaViRequirements } from '../lib/gta6-requirements';
+import {
+  getRecommendedRequirements,
+  getRequirementDisclaimer,
+  getRequirementLabel,
+  getRequirementLastUpdated,
+} from '../data/gta6-requirements';
 import type { ComponentStatus, CompatibilityResult } from '../lib/compatibility';
+
+const recommendedRequirements = getRecommendedRequirements();
 
 interface CompatibilityResultsProps {
   result: CompatibilityResult;
@@ -11,7 +18,6 @@ interface CompatibilityResultsProps {
   storageType: string;
   onStorageSave: (capacity: string, storageType: string) => boolean;
   title: string;
-  disclaimer: string;
   allowStorageQuickEdit?: boolean;
   sectionId?: string;
 }
@@ -22,7 +28,6 @@ export function CompatibilityResults({
   storageType,
   onStorageSave,
   title,
-  disclaimer,
   allowStorageQuickEdit = true,
   sectionId = 'analysis-results',
 }: CompatibilityResultsProps) {
@@ -201,9 +206,17 @@ export function CompatibilityResults({
         </div>
       ) : null}
 
-      <p className="border-t border-slate-700/50 px-4 py-3 text-xs leading-relaxed text-slate-500 sm:px-6">
-        {disclaimer}
-      </p>
+      <div className="border-t border-slate-700/50 px-4 py-3 sm:px-6">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          {getRequirementLabel()}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          {getRequirementDisclaimer()}
+        </p>
+        <p className="mt-1 text-[11px] text-slate-600">
+          Last updated: {getRequirementLastUpdated()}
+        </p>
+      </div>
     </section>
   );
 }
@@ -232,20 +245,20 @@ function StatusBadge({ status, label }: StatusBadgeProps) {
 
 function getUpgradeRecommendation(key: CompatibilityResult['components'][number]['key']) {
   if (key === 'cpu') {
-    return `${gtaViRequirements.recommended.cpu.intel} or ${gtaViRequirements.recommended.cpu.amd} recommended.`;
+    return `${recommendedRequirements.cpu.intel} or ${recommendedRequirements.cpu.amd} recommended.`;
   }
 
   if (key === 'gpu') {
-    return `${gtaViRequirements.recommended.gpu.nvidia} or ${gtaViRequirements.recommended.gpu.amd} recommended.`;
+    return `${recommendedRequirements.gpu.nvidia} or ${recommendedRequirements.gpu.amd} recommended.`;
   }
 
   if (key === 'ram') {
-    return `${gtaViRequirements.recommended.ramGb} GB RAM recommended.`;
+    return `${recommendedRequirements.ramGb} GB RAM recommended.`;
   }
 
   if (key === 'storage') {
-    return `${gtaViRequirements.recommended.storageGb} GB or more free storage recommended.`;
+    return `${recommendedRequirements.storageGb} GB or more free storage and ${recommendedRequirements.storageType} recommended.`;
   }
 
-  return `${gtaViRequirements.recommended.os} recommended.`;
+  return `${recommendedRequirements.operatingSystem} recommended.`;
 }

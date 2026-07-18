@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { evaluateCompatibility } from './compatibility';
+import { detectedToEditableSpecs } from './hardware-types';
+import { parseHardwareSpecs } from './hardware-parser';
 import { createManualDetectedSpecs, normalizeManualEntry } from './manual-entry';
 
 function analyzeManualInput(input: Parameters<typeof normalizeManualEntry>[0]) {
@@ -12,6 +14,34 @@ function analyzeManualInput(input: Parameters<typeof normalizeManualEntry>[0]) {
 }
 
 describe('manual entry normalization', () => {
+  it('produces the same component and overall results as screenshot analysis for identical specs', () => {
+    const screenshot = parseHardwareSpecs(
+      [
+        'Processor Intel Core i7-12700K',
+        'GPU NVIDIA GeForce RTX 3070',
+        'Installed Physical Memory (RAM) 32 GB',
+        'Storage 150 GB NVMe SSD',
+        'OS Name Microsoft Windows 11 Pro',
+      ].join('\n'),
+    );
+    const screenshotSpecs = detectedToEditableSpecs(screenshot.specs);
+    const screenshotResult = evaluateCompatibility(screenshotSpecs, screenshot.specs);
+    const manual = analyzeManualInput({
+      cpu: 'Intel Core i7-12700K',
+      gpu: 'NVIDIA GeForce RTX 3070',
+      ram: '32 GB',
+      storageCapacity: '150 GB',
+      storageType: 'NVMe SSD',
+      windowsVersion: 'Windows 11',
+    });
+
+    expect(manual.normalized.errors).toEqual([]);
+    expect(manual.compatibilityResult.overall).toEqual(screenshotResult.overall);
+    expect(
+      manual.compatibilityResult.components.map(({ key, status }) => ({ key, status })),
+    ).toEqual(screenshotResult.components.map(({ key, status }) => ({ key, status })));
+  });
+
   it('produces the same result manually as the screenshot analyzer for Ryzen 7 8845HS + Radeon 780M + 32 GB + Windows 11', () => {
     const analysis = analyzeManualInput({
       cpu: 'AMD Ryzen 7 8845HS',

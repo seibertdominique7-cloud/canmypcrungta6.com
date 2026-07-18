@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Can My PC Run GTA VI? | PC Requirements Checker",
-  description: "Check if your gaming PC meets the estimated requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.",
+  description: "Check if your gaming PC meets the current requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.",
 };
 
 export default function RootLayout({

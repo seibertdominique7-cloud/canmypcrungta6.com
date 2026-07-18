@@ -1,5 +1,9 @@
 import { FeatureCard } from './components/FeatureCard';
 import { ScreenshotAnalyzer } from './components/ScreenshotAnalyzer';
+import {
+  getRequirementDisclaimer,
+  getRequirementLabel,
+} from './data/gta6-requirements';
 
 export default function Home() {
   return (
@@ -25,14 +29,13 @@ export default function Home() {
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mb-6 leading-relaxed">
-            Check if your gaming rig meets the estimated requirements for Grand Theft Auto VI. Get
+            Check if your gaming rig meets the current requirements for Grand Theft Auto VI. Get
             instant compatibility results and personalized upgrade recommendations.
           </p>
 
           {/* Disclaimer */}
           <p className="text-sm text-slate-400 italic max-w-2xl">
-            {'\u26A0\uFE0F'} Disclaimer: Rockstar Games has not released official PC requirements.
-            These are community estimates based on available information.
+            {'\u26A0\uFE0F'} {getRequirementLabel()}: {getRequirementDisclaimer()}
           </p>
         </header>
 
@@ -58,7 +61,7 @@ export default function Home() {
           <FeatureCard
             icon={'\u26A1'}
             title="Upgrade Recommendations"
-            description="Get personalized upgrade suggestions to meet the estimated GTA VI requirements."
+            description="Get personalized upgrade suggestions to meet the current GTA VI requirements."
           />
         </section>
       </main>

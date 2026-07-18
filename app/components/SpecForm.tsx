@@ -3,6 +3,10 @@
 import { type FormEvent, type RefObject, useId } from 'react';
 
 import {
+  getMinimumRequirements,
+  getRecommendedRequirements,
+} from '../data/gta6-requirements';
+import {
   MANUAL_CPU_SUGGESTIONS,
   MANUAL_GPU_SUGGESTIONS,
   MANUAL_RAM_SUGGESTIONS,
@@ -11,6 +15,9 @@ import {
 } from '../lib/manual-entry';
 import type { EditableHardwareSpecs } from '../lib/hardware-types';
 import { MANUAL_STORAGE_TYPES } from '../lib/manual-storage';
+
+const minimumRequirements = getMinimumRequirements();
+const recommendedRequirements = getRecommendedRequirements();
 
 export type ManualFormFieldKey =
   | 'cpu'
@@ -62,7 +69,7 @@ export function SpecForm({
           label="CPU"
           helperText="Example: AMD Ryzen 7 8845HS"
           value={specs.cpu}
-          placeholder="Intel Core i7-12700K"
+          placeholder={recommendedRequirements.cpu.intel}
           listId={cpuListId}
           suggestions={MANUAL_CPU_SUGGESTIONS}
           onChange={(value) => onChange('cpu', value)}
@@ -72,7 +79,7 @@ export function SpecForm({
           label="GPU"
           helperText="Example: AMD Radeon 780M Graphics"
           value={specs.gpu}
-          placeholder="NVIDIA RTX 3070"
+          placeholder={recommendedRequirements.gpu.nvidia}
           listId={gpuListId}
           suggestions={MANUAL_GPU_SUGGESTIONS}
           onChange={(value) => onChange('gpu', value)}
@@ -80,9 +87,9 @@ export function SpecForm({
 
         <Field
           label="RAM"
-          helperText="Example: 32 GB"
+          helperText={`Example: ${recommendedRequirements.ramGb} GB`}
           value={specs.ram}
-          placeholder="16 GB"
+          placeholder={`${minimumRequirements.ramGb} GB`}
           listId={ramListId}
           suggestions={MANUAL_RAM_SUGGESTIONS}
           inputMode="decimal"
@@ -113,7 +120,7 @@ export function SpecForm({
 
         <SelectField
           label="Windows version"
-          helperText="Example: Windows 11"
+          helperText={`Example: ${recommendedRequirements.operatingSystem}`}
           value={specs.windowsVersion}
           placeholder="Select Windows version"
           options={MANUAL_WINDOWS_OPTIONS}

@@ -1,3 +1,8 @@
+import {
+  getMinimumRequirements,
+  getRecommendedRequirements,
+} from '../data/gta6-requirements';
+
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'none';
 
 export type HardwareFieldKey =
@@ -26,6 +31,9 @@ export type DetectedHardwareSpecs = Record<HardwareFieldKey, DetectedHardwareFie
 
 export type EditableHardwareSpecs = Record<HardwareFieldKey, string>;
 
+const minimumRequirements = getMinimumRequirements();
+const recommendedRequirements = getRecommendedRequirements();
+
 export const HARDWARE_FIELDS: HardwareFieldDefinition[] = [
   {
     key: 'manufacturer',
@@ -40,17 +48,17 @@ export const HARDWARE_FIELDS: HardwareFieldDefinition[] = [
   {
     key: 'cpu',
     label: 'CPU',
-    placeholder: 'Intel Core i7-12700K or AMD Ryzen 7 5800X',
+    placeholder: `${recommendedRequirements.cpu.intel} or ${recommendedRequirements.cpu.amd}`,
   },
   {
     key: 'gpu',
     label: 'GPU',
-    placeholder: 'NVIDIA RTX 3070 or AMD RX 6700 XT',
+    placeholder: `${recommendedRequirements.gpu.nvidia} or ${recommendedRequirements.gpu.amd}`,
   },
   {
     key: 'ram',
     label: 'RAM',
-    placeholder: '16 GB',
+    placeholder: `${minimumRequirements.ramGb} GB`,
   },
   {
     key: 'storage',
@@ -65,7 +73,7 @@ export const HARDWARE_FIELDS: HardwareFieldDefinition[] = [
   {
     key: 'windowsVersion',
     label: 'Windows Version',
-    placeholder: 'Windows 10 or Windows 11',
+    placeholder: `${minimumRequirements.operatingSystem} or ${recommendedRequirements.operatingSystem}`,
   },
 ];
 

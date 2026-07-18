@@ -1,4 +1,9 @@
-import { gtaViRequirements } from './gta6-requirements';
+import { CPU_PERFORMANCE_TIERS } from './cpu-tiers';
+import { GPU_PERFORMANCE_TIERS } from './gpu-tiers';
+import {
+  getMinimumRequirements,
+  getRecommendedRequirements,
+} from '../data/gta6-requirements';
 import {
   createEmptyDetectedSpecs,
   createEmptyEditableSpecs,
@@ -23,34 +28,32 @@ export interface NormalizedManualEntry {
 }
 
 const MANUAL_RAM_PATTERN = /^(\d+(?:[.,]\d+)?)\s*(GB)$/i;
+const minimumRequirements = getMinimumRequirements();
+const recommendedRequirements = getRecommendedRequirements();
 
-export const MANUAL_CPU_SUGGESTIONS = [
-  gtaViRequirements.minimum.cpu.intel,
-  gtaViRequirements.minimum.cpu.amd,
-  gtaViRequirements.recommended.cpu.intel,
-  gtaViRequirements.recommended.cpu.amd,
-  'Intel Core i5-12400F',
-  'AMD Ryzen 5 5600X',
-  'Intel Core i7-14700K',
-  'AMD Ryzen 7 7800X3D',
-].filter((value): value is string => Boolean(value));
+export const MANUAL_CPU_SUGGESTIONS = CPU_PERFORMANCE_TIERS.map(
+  (entry) => entry.canonicalName,
+);
 
-export const MANUAL_GPU_SUGGESTIONS = [
-  gtaViRequirements.minimum.gpu.nvidia,
-  gtaViRequirements.minimum.gpu.amd,
-  gtaViRequirements.recommended.gpu.nvidia,
-  gtaViRequirements.recommended.gpu.amd,
-  'NVIDIA RTX 4060',
-  'AMD RX 7600',
-  'Intel Iris Xe Graphics',
-  'AMD Radeon 780M Graphics',
-].filter((value): value is string => Boolean(value));
+export const MANUAL_GPU_SUGGESTIONS = GPU_PERFORMANCE_TIERS.map(
+  (entry) => entry.canonicalName,
+);
 
-export const MANUAL_RAM_SUGGESTIONS = ['8 GB', '16 GB', '32 GB', '64 GB'];
+export const MANUAL_RAM_SUGGESTIONS = [
+  '8 GB',
+  `${minimumRequirements.ramGb} GB`,
+  `${recommendedRequirements.ramGb} GB`,
+  '64 GB',
+];
 
 export const MANUAL_STORAGE_CAPACITY_SUGGESTIONS = ['256 GB', '512 GB', '1 TB', '2 TB'];
 
-export const MANUAL_WINDOWS_OPTIONS = ['Windows 10', 'Windows 11'];
+export const MANUAL_WINDOWS_OPTIONS = Array.from(
+  new Set([
+    minimumRequirements.operatingSystem,
+    recommendedRequirements.operatingSystem,
+  ]),
+);
 
 export function normalizeManualEntry(input: ManualEntryInput): NormalizedManualEntry {
   const specs = createEmptyEditableSpecs();
@@ -83,7 +86,7 @@ export function normalizeManualEntry(input: ManualEntryInput): NormalizedManualE
   if (!ram) {
     errors.push('RAM is required.');
   } else if (!normalizeRamValue(ram)) {
-    errors.push('RAM should look like 8 GB, 16 GB, 32 GB, or 64 GB.');
+    errors.push(`RAM should look like ${MANUAL_RAM_SUGGESTIONS.join(', ')}.`);
   }
 
   if (storageCapacity && !parsedStorage) {
@@ -103,7 +106,7 @@ export function normalizeManualEntry(input: ManualEntryInput): NormalizedManualE
   }
 
   if (windowsVersion && !normalizeWindowsVersion(windowsVersion)) {
-    errors.push('Choose Windows 10, Windows 11, or leave the field blank.');
+    errors.push(`Choose ${MANUAL_WINDOWS_OPTIONS.join(', ')}, or leave the field blank.`);
   }
 
   return { specs, errors };
@@ -138,11 +141,18 @@ function normalizeWindowsVersion(value: string) {
     return '';
   }
 
-  if (/^Windows\s*(10|11)$/i.test(value)) {
-    return value.replace(/\s+/g, ' ').replace(/Windows\s*(10|11)/i, 'Windows $1');
+  const match = value.match(/^Windows\s*(\d{1,2})$/i);
+
+  if (!match) {
+    return null;
   }
 
-  return null;
+  const normalized = `Windows ${match[1]}`;
+  return (
+    MANUAL_WINDOWS_OPTIONS.find(
+      (option) => option.toLowerCase() === normalized.toLowerCase(),
+    ) ?? null
+  );
 }
 
 function normalizeRamValue(value: string) {

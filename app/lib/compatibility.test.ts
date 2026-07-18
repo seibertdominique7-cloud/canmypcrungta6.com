@@ -18,7 +18,7 @@ describe('evaluateCompatibility consumer results', () => {
         cpu: 'Intel Core i7-12700K',
         gpu: 'NVIDIA RTX 3070',
         ram: '32 GB',
-        storage: '320 GB NVMe SSD',
+        storage: '150 GB NVMe SSD',
         storageType: 'NVMe SSD',
         windowsVersion: 'Windows 11',
       }),
@@ -48,8 +48,8 @@ describe('evaluateCompatibility consumer results', () => {
         cpu: 'Intel Core i5-9600K',
         gpu: 'NVIDIA GTX 1660',
         ram: '16 GB',
-        storage: '320 GB SSD',
-        storageType: 'SSD',
+        storage: '150 GB HDD',
+        storageType: 'HDD',
         windowsVersion: 'Windows 10',
       }),
       null,
@@ -57,7 +57,7 @@ describe('evaluateCompatibility consumer results', () => {
 
     expect(result.overall.title).toBe('PASS — Minimum');
     expect(result.components.find((component) => component.key === 'storage')?.detected).toBe(
-      '320 GB SSD',
+      '150 GB HDD',
     );
   });
 
