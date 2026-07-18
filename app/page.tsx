@@ -1,4 +1,5 @@
 import { FeatureCard } from './components/FeatureCard';
+import { EmailSignup } from './components/EmailSignup';
 import { ScreenshotAnalyzer } from './components/ScreenshotAnalyzer';
 import {
   getRequirementDisclaimer,
@@ -64,6 +65,10 @@ export default function Home() {
             description="Get personalized upgrade suggestions to meet the current GTA VI requirements."
           />
         </section>
+
+        <div className="mb-16 mt-10 flex w-full justify-center px-4 sm:mt-12 sm:px-0">
+          <EmailSignup signupSource="homepage" variant="homepage" />
+        </div>
       </main>
 
     </div>

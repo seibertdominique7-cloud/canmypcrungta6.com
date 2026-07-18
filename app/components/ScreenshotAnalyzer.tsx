@@ -570,6 +570,7 @@ function ScreenshotUploadPanel({
                 onStorageSave={onStorageSave}
                 title={SCREENSHOT_UPLOAD_COPY.resultsTitle}
                 allowStorageQuickEdit
+                signupSource="screenshot-result"
                 actions={
                   <>
                     {analysisMessage ? <AnalysisNotice message={analysisMessage} /> : null}

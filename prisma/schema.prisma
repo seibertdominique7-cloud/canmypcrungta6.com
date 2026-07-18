@@ -111,3 +111,25 @@ model GamePurchaseLink {
 
   @@index([enabled, displayOrder])
 }
+
+model EmailSubscriber {
+  id                String    @id @default(cuid())
+  email             String
+  normalizedEmail   String    @unique
+  unsubscribeKey    String    @unique @default(cuid())
+  gtaUpdatesConsent Boolean   @default(true)
+  marketingConsent  Boolean   @default(false)
+  scenario          String?
+  signupSource      String
+  status            String    @default("active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  unsubscribedAt    DateTime?
+  lastEmailSentAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([scenario, status])
+  @@index([signupSource, status])
+  @@index([gtaUpdatesConsent, status])
+  @@index([marketingConsent, status])
+}

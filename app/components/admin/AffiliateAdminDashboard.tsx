@@ -257,9 +257,12 @@ export function AffiliateAdminDashboard({
               to visitors. Changes are stored in the database—no source edits required.
             </p>
           </div>
-          <form action="/api/admin/logout" method="post">
-            <button className={secondaryButton} type="submit">Log out</button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <a className={secondaryButton} href="/admin/subscribers">Subscribers</a>
+            <form action="/api/admin/logout" method="post">
+              <button className={secondaryButton} type="submit">Log out</button>
+            </form>
+          </div>
         </header>
 
         <div className="mb-6 grid gap-3 sm:grid-cols-3">

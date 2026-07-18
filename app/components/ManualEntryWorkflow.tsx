@@ -122,6 +122,7 @@ export function ManualEntryWorkflow() {
             title={MANUAL_RESULTS_TITLE}
             allowStorageQuickEdit={false}
             sectionId="manual-results"
+            signupSource="manual-result"
             actions={
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button

@@ -3,12 +3,15 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 import { AffiliateRecommendations } from './AffiliateRecommendations';
+import { EmailSignup } from './EmailSignup';
 import {
   getRequirementDisclaimer,
   getRequirementLabel,
   getRequirementLastUpdated,
 } from '../data/gta6-requirements';
 import type { ComponentStatus, CompatibilityResult } from '../lib/compatibility';
+import { determineRecommendationScenario } from '../lib/recommendation-scenario';
+import type { EmailSignupSource } from '../lib/subscriber-types';
 
 interface CompatibilityResultsProps {
   result: CompatibilityResult;
@@ -20,6 +23,7 @@ interface CompatibilityResultsProps {
   sectionId?: string;
   actions?: ReactNode;
   advancedDetails?: ReactNode;
+  signupSource: Exclude<EmailSignupSource, 'homepage'>;
 }
 
 export function CompatibilityResults({
@@ -32,6 +36,7 @@ export function CompatibilityResults({
   sectionId = 'analysis-results',
   actions,
   advancedDetails,
+  signupSource,
 }: CompatibilityResultsProps) {
   const [isStorageEditorOpen, setIsStorageEditorOpen] = useState(false);
   const [storageCapacityDraft, setStorageCapacityDraft] = useState(storageValue);
@@ -188,6 +193,12 @@ export function CompatibilityResults({
       </div>
 
       <AffiliateRecommendations result={result} />
+
+      <EmailSignup
+        scenario={determineRecommendationScenario(result)}
+        signupSource={signupSource}
+        variant="result"
+      />
 
       {actions ? <div className="border-t border-slate-700/50 p-4 sm:px-6">{actions}</div> : null}
 
