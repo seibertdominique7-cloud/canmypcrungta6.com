@@ -6,19 +6,28 @@ export const AFFILIATE_RETAILERS = [
   'Other',
 ] as const;
 
-export const AFFILIATE_COMPONENT_TYPES = [
+export const PRODUCT_COMPONENT_TYPES = [
   'GPU',
   'CPU',
   'RAM',
   'Storage',
-  'Prebuilt PC',
+  'Prebuilt Desktop',
+  'Gaming Laptop',
   'Monitor',
   'Controller',
   'Keyboard',
   'Mouse',
   'Headset',
-  'Game Purchase',
+  'Game',
   'Other',
+] as const;
+
+// Retained for the rollback-only AffiliateProduct API. New catalog forms use
+// PRODUCT_COMPONENT_TYPES exclusively.
+export const AFFILIATE_COMPONENT_TYPES = [
+  ...PRODUCT_COMPONENT_TYPES,
+  'Prebuilt PC',
+  'Game Purchase',
 ] as const;
 
 export const AFFILIATE_BADGES = [
@@ -47,6 +56,7 @@ export const GAME_RELEASE_STATUSES = [
 
 export type AffiliateRetailer = (typeof AFFILIATE_RETAILERS)[number];
 export type AffiliateComponentType = (typeof AFFILIATE_COMPONENT_TYPES)[number];
+export type ProductComponentType = (typeof PRODUCT_COMPONENT_TYPES)[number];
 export type AffiliateBadge = (typeof AFFILIATE_BADGES)[number];
 export type RecommendationGroupType = (typeof RECOMMENDATION_GROUP_TYPES)[number];
 export type GamePurchasePlatform = (typeof GAME_PURCHASE_PLATFORMS)[number];
@@ -54,6 +64,7 @@ export type GameReleaseStatus = (typeof GAME_RELEASE_STATUSES)[number];
 
 export interface AffiliateProductRecord {
   id: string;
+  productId?: string;
   title: string;
   retailer: AffiliateRetailer;
   affiliateUrl: string;
@@ -67,6 +78,47 @@ export interface AffiliateProductRecord {
   enabled: boolean;
   displayOrder: number;
   sectionId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductUsageRecord {
+  assignmentId: string;
+  sectionId: string;
+  sectionTitle: string;
+  scenarioCode: string;
+  scenarioName: string;
+  assignmentEnabled: boolean;
+}
+
+export interface ProductRecord {
+  id: string;
+  title: string;
+  canonicalName: string;
+  componentType: ProductComponentType;
+  shortDescription: string;
+  imageUrl: string | null;
+  retailer: AffiliateRetailer;
+  affiliateUrl: string;
+  defaultPriceText: string;
+  platform: GamePurchasePlatform | null;
+  enabled: boolean;
+  usage: ProductUsageRecord[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendationAssignmentRecord {
+  id: string;
+  productId: string;
+  sectionId: string;
+  badge: AffiliateBadge;
+  buttonText: string;
+  overridePriceText: string | null;
+  overrideDescription: string | null;
+  enabled: boolean;
+  displayOrder: number;
+  product: ProductRecord;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,8 +139,14 @@ export interface RecommendationSectionRecord {
   purpose: RecommendationSectionPurpose;
   isCore: boolean;
   products: AffiliateProductRecord[];
+  assignments?: RecommendationAssignmentRecord[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RecommendationWorkspace {
+  scenarios: RecommendationScenarioRecord[];
+  products: ProductRecord[];
 }
 
 export interface RecommendationScenarioRecord {

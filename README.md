@@ -29,7 +29,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 2. Set `ADMIN_PASSWORD` to a strong private password.
 3. Set `SESSION_SECRET` to a long random value of at least 32 characters.
 4. Restart `npm run dev` after changing environment variables.
-5. Open [http://localhost:3000/admin/affiliate-links](http://localhost:3000/admin/affiliate-links).
+5. Open [http://localhost:3000/admin/products](http://localhost:3000/admin/products) for the reusable product catalog, or `/admin/recommendations` for scenario assignments.
 
 Generate a session secret in PowerShell:
 

@@ -1,6 +1,6 @@
 # Affiliate admin setup
 
-The private affiliate manager is available at `/admin/affiliate-links`. It uses server-only
+The private recommendation manager is available at `/admin/products` and `/admin/recommendations`. It uses server-only
 password verification and a signed, HTTP-only session cookie. There are no public accounts or
 registration flows.
 
@@ -54,7 +54,7 @@ image URLs are required to use HTTPS.
 
 ## Admin workflow
 
-Open `/admin/affiliate-links`, then:
+Open `/admin/products` to manage reusable catalog products, then use `/admin/recommendations` to assign them to scenario sections:
 
 1. Choose a compatibility-result scenario.
 2. Choose or create a recommendation section.

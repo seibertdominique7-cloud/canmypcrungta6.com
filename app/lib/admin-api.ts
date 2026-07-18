@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { AdminDataError } from './affiliate-data';
+import { AdminDataError } from './admin-data-error';
 
 export async function readJson(request: Request) {
   try {

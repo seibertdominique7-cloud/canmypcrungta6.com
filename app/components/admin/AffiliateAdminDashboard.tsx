@@ -156,7 +156,7 @@ export function AffiliateAdminDashboard({
 
   const applyResponse = (payload: AdminResponse) => {
     if (payload.scenarios) setScenarios(payload.scenarios);
-    setNotice(payload.warnings?.join(' ') ?? 'Saved.');
+    setNotice(payload.warnings?.length ? payload.warnings.join(' ') : 'Saved.');
   };
 
   const request = async (
@@ -594,7 +594,7 @@ export function AffiliateAdminDashboard({
       </div>
 
       {editor && selectedScenario && (
-        <EditorModal onClose={() => setEditor(null)} title={editorTitle(editor)}>
+        <EditorModal error={error} onClose={() => setEditor(null)} title={editorTitle(editor)}>
           {editor.kind === 'scenario' && (
             <ScenarioForm busy={busy} onSave={saveScenario} scenario={editor.value} />
           )}
@@ -688,24 +688,47 @@ function SectionForm({ section, scenarioId, busy, onSave }: { section: Recommend
 
 function ProductForm({ product, sectionId, sections, busy, onSave }: { product: AffiliateProductRecord | null; sectionId: string; sections: Array<{ section: RecommendationSectionRecord; label: string }>; busy: boolean; onSave: (input: AffiliateProductInput, id?: string) => void }) {
   const [draft, setDraft] = useState<AffiliateProductInput>(() => product ? toProductInput(product) : { title: '', retailer: 'Other', affiliateUrl: '', imageUrl: null, priceText: 'Check current price', badge: 'None', shortDescription: '', buttonText: 'View option', componentType: 'Other', platform: null, enabled: true, sectionId });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<ProductField, string>>>({});
   const domain = getDomain(draft.affiliateUrl);
+  const submit = () => {
+    const errors = validateProductDraft(draft);
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.info('[admin/products] Save blocked by client validation', {
+          fields: Object.keys(errors),
+        });
+      }
+      return;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[admin/products] Saving product', {
+        mode: product ? 'update' : 'create',
+        sectionId: draft.sectionId,
+        titleLength: draft.title.trim().length,
+      });
+    }
+    onSave(draft, product?.id);
+  };
   return (
-    <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); onSave(draft, product?.id); }}>
+    <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <Field label="Destination section"><SelectInput onChange={(value) => setDraft({ ...draft, sectionId: value })} options={sections.map(({ section, label }) => [section.id, label])} value={draft.sectionId} /></Field>
-      <Field label="Title"><TextInput onChange={(value) => setDraft({ ...draft, title: value })} placeholder="NVIDIA RTX 4070" value={draft.title} /></Field>
+      <Field error={fieldErrors.title} label="Title"><TextInput onChange={(value) => setDraft({ ...draft, title: value })} placeholder="NVIDIA RTX 4070" value={draft.title} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Retailer"><SelectInput onChange={(value) => setDraft({ ...draft, retailer: value as AffiliateProductInput['retailer'] })} options={AFFILIATE_RETAILERS.map((value) => [value, value])} value={draft.retailer} /></Field>
         <Field label="Component type"><SelectInput onChange={(value) => setDraft({ ...draft, componentType: value as AffiliateProductInput['componentType'] })} options={AFFILIATE_COMPONENT_TYPES.map((value) => [value, value])} value={draft.componentType} /></Field>
       </div>
-      <Field label="Exact HTTPS affiliate URL"><TextInput onChange={(value) => setDraft({ ...draft, affiliateUrl: value })} placeholder="https://retailer.example/product" value={draft.affiliateUrl} /><span className="mt-1 block text-xs text-slate-500">Detected domain: {domain || 'Enter a valid HTTPS URL'}. The URL is stored exactly as entered.</span></Field>
+      <Field error={fieldErrors.affiliateUrl} label="Exact HTTPS affiliate URL"><TextInput onChange={(value) => setDraft({ ...draft, affiliateUrl: value })} placeholder="https://retailer.example/product" value={draft.affiliateUrl} /><span className="mt-1 block text-xs text-slate-500">Detected domain: {domain || 'Enter a valid HTTPS URL'}. The URL is stored exactly as entered.</span></Field>
       <Field label="Optional HTTPS image URL"><TextInput onChange={(value) => setDraft({ ...draft, imageUrl: value || null })} placeholder="https://..." value={draft.imageUrl ?? ''} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Admin-entered price text"><TextInput onChange={(value) => setDraft({ ...draft, priceText: value })} placeholder="Check current price" value={draft.priceText} /></Field>
+        <Field error={fieldErrors.priceText} label="Admin-entered price text"><TextInput onChange={(value) => setDraft({ ...draft, priceText: value })} placeholder="Check current price" value={draft.priceText} /></Field>
         <Field label="Badge"><SelectInput onChange={(value) => setDraft({ ...draft, badge: value as AffiliateProductInput['badge'] })} options={AFFILIATE_BADGES.map((value) => [value, value])} value={draft.badge} /></Field>
       </div>
-      <Field label="Short description"><TextArea onChange={(value) => setDraft({ ...draft, shortDescription: value })} value={draft.shortDescription} /></Field>
+      <Field error={fieldErrors.shortDescription} label="Short description"><TextArea onChange={(value) => setDraft({ ...draft, shortDescription: value })} value={draft.shortDescription} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Button text"><TextInput onChange={(value) => setDraft({ ...draft, buttonText: value })} value={draft.buttonText} /></Field>
+        <Field error={fieldErrors.buttonText} label="Button text"><TextInput onChange={(value) => setDraft({ ...draft, buttonText: value })} value={draft.buttonText} /></Field>
         <Field label="Platform (purchase links only)"><SelectInput onChange={(value) => setDraft({ ...draft, platform: value ? value as AffiliateProductInput['platform'] : null })} options={[['', 'Not applicable'], ...GAME_PURCHASE_PLATFORMS.map((value) => [value, value] as [string, string])]} value={draft.platform ?? ''} /></Field>
       </div>
       {draft.platform === 'PC' && <p className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs text-amber-200">Only enable a PC purchase link after an official PC listing exists.</p>}
@@ -724,11 +747,12 @@ function ProductForm({ product, sectionId, sections, busy, onSave }: { product: 
   );
 }
 
-function EditorModal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+function EditorModal({ title, children, error, onClose }: { title: string; children: ReactNode; error: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 backdrop-blur-sm">
       <div className="mx-auto my-6 max-w-2xl rounded-3xl border border-white/15 bg-[#0d111d] p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4"><h2 className="text-xl font-black">{title}</h2><button className={secondaryButton} onClick={onClose} type="button">Close</button></div>
+        {error ? <p aria-live="polite" className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p> : null}
         {children}
       </div>
     </div>
@@ -847,7 +871,7 @@ function moveIdBefore(ids: string[], draggedId: string, targetId: string) {
   return next;
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}</label>; }
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}{error ? <span className="text-xs font-semibold text-red-300">{error}</span> : null}</label>; }
 function TextInput({ value, onChange, placeholder = '', disabled = false }: { value: string; onChange: (value: string) => void; placeholder?: string; disabled?: boolean }) { return <input className={inputClass} disabled={disabled} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} value={value} />; }
 function TextArea({ value, onChange }: { value: string; onChange: (value: string) => void }) { return <textarea className={`${inputClass} min-h-24 resize-y`} onChange={(event) => onChange(event.target.value)} value={value} />; }
 function SelectInput({ value, options, onChange }: { value: string; options: readonly (readonly [string, string])[]; onChange: (value: string) => void }) { return <select className={inputClass} onChange={(event) => onChange(event.target.value)} value={value}>{options.map(([optionValue, label]) => <option className="bg-slate-950" key={optionValue} value={optionValue}>{label}</option>)}</select>; }
@@ -861,6 +885,28 @@ function toProductInput(product: AffiliateProductRecord): AffiliateProductInput 
 function editorTitle(editor: Exclude<Editor, null>) { if (editor.kind === 'scenario') return editor.value ? 'Edit scenario' : 'Add scenario'; if (editor.kind === 'section') return editor.value ? 'Edit section' : 'Add section'; return editor.value ? 'Edit or move product' : 'Add product'; }
 function getDomain(value: string) { try { return new URL(value).hostname.toLowerCase(); } catch { return ''; } }
 function confirmAction(message: string, action: () => void) { if (window.confirm(message)) action(); }
+
+type ProductField = 'title' | 'affiliateUrl' | 'priceText' | 'shortDescription' | 'buttonText';
+
+function validateProductDraft(input: AffiliateProductInput): Partial<Record<ProductField, string>> {
+  const errors: Partial<Record<ProductField, string>> = {};
+  if (!input.title.trim()) errors.title = 'Enter a product title.';
+  if (!input.affiliateUrl.trim()) {
+    errors.affiliateUrl = 'Enter an HTTPS affiliate URL.';
+  } else {
+    try {
+      if (new URL(input.affiliateUrl).protocol !== 'https:') {
+        errors.affiliateUrl = 'Affiliate URL must use HTTPS.';
+      }
+    } catch {
+      errors.affiliateUrl = 'Enter a valid HTTPS affiliate URL.';
+    }
+  }
+  if (!input.priceText.trim()) errors.priceText = 'Enter price text.';
+  if (!input.shortDescription.trim()) errors.shortDescription = 'Enter a short description.';
+  if (!input.buttonText.trim()) errors.buttonText = 'Enter button text.';
+  return errors;
+}
 
 const inputClass = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-400/60 disabled:opacity-50';
 const compactInputClass = 'min-w-0 rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-violet-400/60';

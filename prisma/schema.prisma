@@ -39,10 +39,51 @@ model RecommendationSection {
   purpose            String                 @default("GENERAL")
   isCore             Boolean                @default(false)
   products           AffiliateProduct[]
+  assignments        RecommendationAssignment[]
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 
   @@index([scenarioId, enabled, displayOrder])
+}
+
+model Product {
+  id                  String                     @id @default(cuid())
+  title               String
+  canonicalName       String
+  componentType       String
+  shortDescription    String                     @default("")
+  imageUrl            String?
+  retailer            String                     @default("Other")
+  affiliateUrl        String
+  defaultPriceText    String                     @default("Check current price")
+  platform            String?
+  enabled             Boolean                    @default(true)
+  assignments         RecommendationAssignment[]
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@index([canonicalName])
+  @@index([componentType, enabled])
+  @@index([retailer, enabled])
+}
+
+model RecommendationAssignment {
+  id                  String                @id @default(cuid())
+  productId           String
+  product             Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sectionId           String
+  section             RecommendationSection @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  badge               String                @default("None")
+  buttonText          String                @default("View Product")
+  overridePriceText   String?
+  overrideDescription String?
+  enabled             Boolean               @default(true)
+  displayOrder        Int
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([sectionId, enabled, displayOrder])
+  @@index([productId, enabled])
 }
 
 model AffiliateProduct {

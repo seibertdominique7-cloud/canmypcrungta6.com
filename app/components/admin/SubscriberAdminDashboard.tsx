@@ -132,7 +132,7 @@ export function SubscriberAdminDashboard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a className={secondaryButton} href="/admin/affiliate-links">
+            <a className={secondaryButton} href="/admin/recommendations">
               Recommendations
             </a>
             <form action="/api/admin/logout" method="post">

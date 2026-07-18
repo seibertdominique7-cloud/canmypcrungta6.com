@@ -348,6 +348,7 @@ async function main() {
 
   await migrateLegacyPrebuiltProducts();
   await migrateLegacyPurchaseLinks();
+  await syncCatalogFromLegacy();
 
   console.log(
     `Seeded ${CORE_RECOMMENDATION_SCENARIOS.length} result scenarios, ${defaultSectionCount} editable sections, ${PREBUILT_RECOMMENDATION_GROUPS.length} preserved legacy prebuilt groups, and ${seedLinks.length} example affiliate products.`,
@@ -446,6 +447,72 @@ async function migrateLegacyPurchaseLinks() {
           legacySourceId: purchase.id,
           createdAt: purchase.createdAt,
           updatedAt: purchase.updatedAt,
+        },
+      });
+    }
+  }
+}
+
+async function syncCatalogFromLegacy() {
+  const legacyProducts = await prisma.affiliateProduct.findMany({
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+
+  for (const legacy of legacyProducts) {
+    const canonicalName = legacy.title.trim().replace(/\s+/g, ' ').toLowerCase();
+    let product = await prisma.product.findFirst({
+      where: { canonicalName, affiliateUrl: legacy.affiliateUrl },
+    });
+
+    if (!product) {
+      product = await prisma.product.create({
+        data: {
+          id: legacy.id,
+          title: legacy.title,
+          canonicalName,
+          componentType:
+            legacy.componentType === 'Prebuilt PC'
+              ? 'Prebuilt Desktop'
+              : legacy.componentType === 'Game Purchase'
+                ? 'Game'
+                : legacy.componentType,
+          shortDescription: legacy.shortDescription,
+          imageUrl: legacy.imageUrl,
+          retailer: legacy.retailer,
+          affiliateUrl: legacy.affiliateUrl,
+          defaultPriceText: legacy.priceText,
+          platform: legacy.platform,
+          enabled: legacy.enabled,
+          createdAt: legacy.createdAt,
+          updatedAt: legacy.updatedAt,
+        },
+      });
+    }
+
+    const assignmentId = `assignment-${legacy.id}`;
+    const existingAssignment = await prisma.recommendationAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true },
+    });
+
+    if (!existingAssignment) {
+      await prisma.recommendationAssignment.create({
+        data: {
+          id: assignmentId,
+          productId: product.id,
+          sectionId: legacy.sectionId,
+          badge: legacy.badge,
+          buttonText: legacy.buttonText,
+          overridePriceText:
+            legacy.priceText === product.defaultPriceText ? null : legacy.priceText,
+          overrideDescription:
+            legacy.shortDescription === product.shortDescription
+              ? null
+              : legacy.shortDescription,
+          enabled: legacy.enabled,
+          displayOrder: legacy.displayOrder,
+          createdAt: legacy.createdAt,
+          updatedAt: legacy.updatedAt,
         },
       });
     }

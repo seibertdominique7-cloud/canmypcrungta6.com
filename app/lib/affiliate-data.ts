@@ -3,6 +3,8 @@ import 'server-only';
 import type {
   AffiliateProduct,
   GamePurchaseLink,
+  Product,
+  RecommendationAssignment,
   RecommendationScenario,
   RecommendationSection,
 } from '../../generated/prisma/client';
@@ -20,6 +22,7 @@ import type {
   ScenarioInput,
 } from './affiliate-validation';
 import { isPublicHttpsUrl } from './affiliate-validation';
+import { AdminDataError } from './admin-data-error';
 import { prisma } from './prisma';
 
 type SectionWithProducts = RecommendationSection & { products: AffiliateProduct[] };
@@ -91,8 +94,9 @@ export async function getPublicMonetization(
       sections: {
         orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
         include: {
-          products: {
+          assignments: {
             orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+            include: { product: true },
           },
         },
       },
@@ -115,20 +119,35 @@ export async function getPublicMonetization(
     .filter((section) => !section.enabled)
     .map((section) => ({
       title: section.title,
-      enabledProducts: section.products.filter((product) => product.enabled).length,
+      enabledProducts: section.assignments.filter(
+        (assignment) => assignment.enabled && assignment.product.enabled,
+      ).length,
     }));
   const sectionsWithoutEnabledProducts = enabledSections
-    .filter((section) => !section.products.some((product) => product.enabled))
+    .filter(
+      (section) =>
+        !section.assignments.some(
+          (assignment) => assignment.enabled && assignment.product.enabled,
+        ),
+    )
     .map((section) => section.title);
   const productsFound = enabledSections.reduce(
     (total, section) =>
-      total + section.products.filter((product) => product.enabled).length,
+      total +
+      section.assignments.filter(
+        (assignment) => assignment.enabled && assignment.product.enabled,
+      ).length,
     0,
   );
   const productsRejectedByUrl = enabledSections.flatMap((section) =>
-    section.products
-      .filter((product) => product.enabled && !isPublicHttpsUrl(product.affiliateUrl))
-      .map((product) => product.title),
+    section.assignments
+      .filter(
+        (assignment) =>
+          assignment.enabled &&
+          assignment.product.enabled &&
+          !isPublicHttpsUrl(assignment.product.affiliateUrl),
+      )
+      .map((assignment) => assignment.product.title),
   );
   const sections = enabledSections
     .map((section) => ({
@@ -139,11 +158,11 @@ export async function getPublicMonetization(
       collapsedByDefault: section.collapsedByDefault,
       layout: section.layout as RecommendationSectionRecord['layout'],
       purpose: section.purpose as RecommendationSectionRecord['purpose'],
-      products: section.products
-        .filter((product) => product.enabled)
-        .filter((product) => isPublicHttpsUrl(product.affiliateUrl))
+      products: section.assignments
+        .filter((assignment) => assignment.enabled && assignment.product.enabled)
+        .filter((assignment) => isPublicHttpsUrl(assignment.product.affiliateUrl))
         .slice(0, Math.max(1, section.maxProducts))
-        .map(serializeProduct),
+        .map(serializePublicAssignment),
     }))
     .filter((section) => section.products.length > 0);
   const renderableProductsFound = sections.reduce(
@@ -595,15 +614,6 @@ export async function moveGamePurchaseLink(id: string, direction: 'up' | 'down')
   for (const link of reordered) await syncLegacyGamePurchaseLink(link);
 }
 
-export class AdminDataError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-  ) {
-    super(message);
-  }
-}
-
 function getRecommendationLimit() {
   const configured = Number.parseInt(process.env.AFFILIATE_RECOMMENDATION_LIMIT ?? '3', 10);
   return Number.isFinite(configured) ? Math.min(12, Math.max(1, configured)) : 3;
@@ -734,6 +744,32 @@ function serializeProduct(product: AffiliateProduct): AffiliateProductRecord {
     platform: product.platform as AffiliateProductRecord['platform'],
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
+  };
+}
+
+function serializePublicAssignment(
+  assignment: RecommendationAssignment & { product: Product },
+): AffiliateProductRecord {
+  return {
+    id: assignment.id,
+    productId: assignment.productId,
+    sectionId: assignment.sectionId,
+    title: assignment.product.title,
+    retailer: assignment.product.retailer as AffiliateProductRecord['retailer'],
+    affiliateUrl: assignment.product.affiliateUrl,
+    imageUrl: assignment.product.imageUrl,
+    priceText: assignment.overridePriceText ?? assignment.product.defaultPriceText,
+    shortDescription:
+      assignment.overrideDescription ?? assignment.product.shortDescription,
+    badge: assignment.badge as AffiliateProductRecord['badge'],
+    buttonText: assignment.buttonText,
+    componentType:
+      assignment.product.componentType as AffiliateProductRecord['componentType'],
+    platform: assignment.product.platform as AffiliateProductRecord['platform'],
+    enabled: assignment.enabled && assignment.product.enabled,
+    displayOrder: assignment.displayOrder,
+    createdAt: assignment.createdAt.toISOString(),
+    updatedAt: assignment.updatedAt.toISOString(),
   };
 }
 

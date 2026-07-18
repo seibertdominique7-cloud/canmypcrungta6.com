@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const destination =
     typeof nextValue === 'string' && nextValue.startsWith('/admin/')
       ? nextValue
-      : '/admin/affiliate-links';
+      : '/admin/products';
   const requestOrigin = request.headers.get('origin') ?? request.url;
   const loginUrl = new URL('/admin/affiliate-links/login', requestOrigin);
 

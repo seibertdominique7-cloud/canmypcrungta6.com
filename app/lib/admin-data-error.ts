@@ -1,0 +1,10 @@
+import 'server-only';
+
+export class AdminDataError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+  }
+}
