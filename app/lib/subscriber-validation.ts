@@ -39,15 +39,8 @@ export function validateSubscriberSignup(value: unknown): SubscriberSignupValida
   const normalizedEmail = normalizeSubscriberEmail(email);
   const signupSource = readSignupSource(value.signupSource);
   const scenario = readScenario(value.scenario);
-  const gtaUpdatesConsent = value.gtaUpdatesConsent === true;
-  const marketingConsent = value.marketingConsent === true;
-
   if (!email || email.length > 254 || !EMAIL_PATTERN.test(normalizedEmail)) {
     return invalid('Enter a valid email address.');
-  }
-
-  if (!gtaUpdatesConsent) {
-    return invalid('Agree to receive GTA VI updates before subscribing.');
   }
 
   if (!signupSource) {
@@ -63,7 +56,7 @@ export function validateSubscriberSignup(value: unknown): SubscriberSignupValida
       email,
       normalizedEmail,
       gtaUpdatesConsent: true,
-      marketingConsent,
+      marketingConsent: true,
       scenario: signupSource === 'homepage' ? null : scenario,
       signupSource,
     },

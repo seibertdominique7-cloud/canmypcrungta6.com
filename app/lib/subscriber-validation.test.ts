@@ -7,11 +7,9 @@ import {
 } from './subscriber-validation';
 
 describe('subscriber signup validation', () => {
-  it('normalizes email while preserving optional marketing consent', () => {
+  it('normalizes email and records the combined signup consent', () => {
     const result = validateSubscriberSignup({
       email: '  Player.One@Example.COM ',
-      gtaUpdatesConsent: true,
-      marketingConsent: false,
       signupSource: 'homepage',
       scenario: null,
       company: '',
@@ -21,31 +19,29 @@ describe('subscriber signup validation', () => {
       email: 'Player.One@Example.COM',
       normalizedEmail: 'player.one@example.com',
       gtaUpdatesConsent: true,
-      marketingConsent: false,
+      marketingConsent: true,
       scenario: null,
       signupSource: 'homepage',
     });
     expect(normalizeSubscriberEmail(' TEST@EXAMPLE.COM ')).toBe('test@example.com');
   });
 
-  it('requires GTA update consent', () => {
+  it('does not require legacy consent flags', () => {
     const result = validateSubscriberSignup({
       email: 'player@example.com',
-      gtaUpdatesConsent: false,
-      marketingConsent: true,
       signupSource: 'homepage',
       company: '',
     });
 
-    expect(result.data).toBeNull();
-    expect(result.errors[0]).toMatch(/agree to receive gta vi updates/i);
+    expect(result.data).toMatchObject({
+      gtaUpdatesConsent: true,
+      marketingConsent: true,
+    });
   });
 
   it('stores the exact result scenario and source', () => {
     const result = validateSubscriberSignup({
       email: 'player@example.com',
-      gtaUpdatesConsent: true,
-      marketingConsent: true,
       signupSource: 'screenshot-result',
       scenario: 'FAIL_GPU',
       company: '',
@@ -61,8 +57,6 @@ describe('subscriber signup validation', () => {
   it('rejects a result signup without a recognized scenario', () => {
     const result = validateSubscriberSignup({
       email: 'player@example.com',
-      gtaUpdatesConsent: true,
-      marketingConsent: false,
       signupSource: 'manual-result',
       scenario: 'fail gpu',
       company: '',

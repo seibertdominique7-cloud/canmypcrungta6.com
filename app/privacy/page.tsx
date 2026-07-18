@@ -31,10 +31,10 @@ export default function PrivacyPage() {
             result.
           </PolicySection>
 
-          <PolicySection title="Optional hardware marketing">
-            Hardware deals and product recommendations use a separate, optional consent choice. It is
-            unchecked by default. Declining hardware marketing does not prevent you from receiving the
-            GTA VI updates you requested.
+          <PolicySection title="Combined signup consent">
+            The current signup form uses one notice for GTA VI updates and occasional gaming
+            hardware offers. Submitting the form records consent for both types of email. You can
+            unsubscribe from future messages at any time.
           </PolicySection>
 
           <PolicySection title="Compatibility segmentation">

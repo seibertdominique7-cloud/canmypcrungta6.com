@@ -24,7 +24,7 @@ export interface SubscriberSignupInput {
   email: string;
   normalizedEmail: string;
   gtaUpdatesConsent: true;
-  marketingConsent: boolean;
+  marketingConsent: true;
   scenario: CoreRecommendationScenarioCode | null;
   signupSource: EmailSignupSource;
 }

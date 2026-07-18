@@ -27,8 +27,6 @@ interface SignupResponse {
 export function EmailSignup(props: EmailSignupProps) {
   const formId = useId();
   const [email, setEmail] = useState('');
-  const [gtaUpdatesConsent, setGtaUpdatesConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
   const [company, setCompany] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -47,8 +45,8 @@ export function EmailSignup(props: EmailSignupProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          gtaUpdatesConsent,
-          marketingConsent,
+          gtaUpdatesConsent: true,
+          marketingConsent: true,
           company,
           signupSource: props.signupSource,
           scenario: props.variant === 'result' ? props.scenario : null,
@@ -66,8 +64,6 @@ export function EmailSignup(props: EmailSignupProps) {
           : "You're subscribed. We'll send GTA VI updates to your email.",
       );
       setEmail('');
-      setGtaUpdatesConsent(false);
-      setMarketingConsent(false);
       setCompany('');
     } catch (requestError) {
       setError(
@@ -117,6 +113,7 @@ export function EmailSignup(props: EmailSignupProps) {
                 className="theme-input min-w-0 flex-1 rounded-lg px-3.5 py-2.5 text-sm font-normal disabled:opacity-60"
                 disabled={busy}
                 id={`${formId}-email`}
+                aria-describedby={`${formId}-consent`}
                 maxLength={254}
                 name="email"
                 onChange={(event) => setEmail(event.target.value)}
@@ -148,34 +145,9 @@ export function EmailSignup(props: EmailSignupProps) {
             />
           </div>
 
-          <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-slate-300">
-            <input
-              checked={gtaUpdatesConsent}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-500 bg-slate-950 accent-fuchsia-500 focus:ring-2 focus:ring-fuchsia-400/40"
-              disabled={busy}
-              name="gtaUpdatesConsent"
-              onChange={(event) => setGtaUpdatesConsent(event.target.checked)}
-              required
-              type="checkbox"
-            />
-            <span>I agree to receive GTA VI release, PC requirement, and compatibility updates.</span>
-          </label>
-
-          <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-slate-400">
-            <input
-              checked={marketingConsent}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-500 bg-slate-950 accent-violet-500 focus:ring-2 focus:ring-violet-400/40"
-              disabled={busy}
-              name="marketingConsent"
-              onChange={(event) => setMarketingConsent(event.target.checked)}
-              type="checkbox"
-            />
-            <span>I would also like occasional gaming hardware deals and product recommendations.</span>
-          </label>
-
-          <p className="text-[11px] leading-5 text-slate-500">
-            By subscribing, you agree to receive the emails you selected. You can unsubscribe at
-            any time. See our{' '}
+          <p id={`${formId}-consent`} className="text-xs leading-5 text-slate-400">
+            By submitting your email, you agree to receive GTA VI updates and occasional gaming
+            hardware offers from CanMyPCRunGTA6. You can unsubscribe at any time.{' '}
             <Link
               className="theme-link font-semibold underline decoration-fuchsia-300/40 underline-offset-2"
               href="/privacy"
