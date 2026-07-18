@@ -127,14 +127,14 @@ export function ManualEntryWorkflow() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  className="flex-1 rounded-lg border border-slate-500 px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-300 hover:bg-slate-700/40"
+                  className="theme-secondary-button flex-1 rounded-lg px-4 py-2.5 text-sm font-bold"
                   onClick={handleEditSpecs}
                 >
                   Edit Specs
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                  className="theme-primary-button flex-1 rounded-lg px-4 py-2.5 text-sm font-bold"
                   onClick={handleReset}
                 >
                   Check Another PC

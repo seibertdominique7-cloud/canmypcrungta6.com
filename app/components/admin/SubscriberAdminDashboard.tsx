@@ -119,7 +119,7 @@ export function SubscriberAdminDashboard({
   const scenarioMetrics = ['FAIL_GPU', 'FAIL_RAM', 'PASS_MINIMUM', 'PASS_RECOMMENDED'] as const;
 
   return (
-    <main className="min-h-screen bg-[#070a12] px-4 py-8 text-slate-100 sm:px-6">
+    <main className="admin-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <div>
@@ -277,7 +277,7 @@ function SubscriberRow({
         <span className={subscriber.gtaUpdatesConsent ? 'text-emerald-300' : 'text-slate-500'}>GTA: {subscriber.gtaUpdatesConsent ? 'Yes' : 'No'}</span><br />
         <span className={subscriber.marketingConsent ? 'text-violet-300' : 'text-slate-500'}>Deals: {subscriber.marketingConsent ? 'Yes' : 'No'}</span>
       </td>
-      <td className="px-3 py-3 font-mono text-[11px] text-cyan-200">{subscriber.scenario ?? 'None'}</td>
+      <td className="px-3 py-3 font-mono text-[11px] text-violet-200">{subscriber.scenario ?? 'None'}</td>
       <td className="px-3 py-3">{formatLabel(subscriber.signupSource)}</td>
       <td className="px-3 py-3 whitespace-nowrap">{formatDate(subscriber.createdAt)}</td>
       <td className="px-3 py-3 whitespace-nowrap">{subscriber.lastEmailSentAt ? formatDate(subscriber.lastEmailSentAt) : 'Never'}</td>

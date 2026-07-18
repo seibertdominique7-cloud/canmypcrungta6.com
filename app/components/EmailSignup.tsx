@@ -83,11 +83,11 @@ export function EmailSignup(props: EmailSignupProps) {
   return (
     <section
       aria-labelledby={`${formId}-heading`}
-      className={`w-full rounded-2xl border border-cyan-400/15 bg-gradient-to-br from-cyan-500/[0.07] via-slate-900/70 to-violet-500/[0.06] text-left shadow-xl shadow-black/10 ${isHomepage ? 'max-w-3xl p-5 sm:p-6' : 'border-x-0 border-b-0 px-4 py-5 sm:px-6'}`}
+      className={`theme-glass-card w-full rounded-2xl text-left ${isHomepage ? 'max-w-3xl p-5 sm:p-6' : 'border-x-0 border-b-0 px-4 py-5 sm:px-6'}`}
     >
       <div className={isHomepage ? 'sm:flex sm:items-start sm:justify-between sm:gap-8' : ''}>
         <div className={isHomepage ? 'sm:max-w-sm' : ''}>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
+          <p className="theme-kicker text-[10px] font-black uppercase tracking-[0.18em]">
             Email updates
           </p>
           <h2 id={`${formId}-heading`} className="mt-1 text-xl font-black text-white">
@@ -114,7 +114,7 @@ export function EmailSignup(props: EmailSignupProps) {
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 autoComplete="email"
-                className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-950/75 px-3.5 py-2.5 text-sm font-normal text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:opacity-60"
+                className="theme-input min-w-0 flex-1 rounded-lg px-3.5 py-2.5 text-sm font-normal disabled:opacity-60"
                 disabled={busy}
                 id={`${formId}-email`}
                 maxLength={254}
@@ -126,7 +126,7 @@ export function EmailSignup(props: EmailSignupProps) {
                 value={email}
               />
               <button
-                className="shrink-0 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+                className="theme-primary-button shrink-0 rounded-lg px-5 py-2.5 text-sm font-black"
                 disabled={busy}
                 type="submit"
               >
@@ -151,7 +151,7 @@ export function EmailSignup(props: EmailSignupProps) {
           <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-slate-300">
             <input
               checked={gtaUpdatesConsent}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-500 bg-slate-950 accent-emerald-500 focus:ring-2 focus:ring-emerald-400/40"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-500 bg-slate-950 accent-fuchsia-500 focus:ring-2 focus:ring-fuchsia-400/40"
               disabled={busy}
               name="gtaUpdatesConsent"
               onChange={(event) => setGtaUpdatesConsent(event.target.checked)}
@@ -177,7 +177,7 @@ export function EmailSignup(props: EmailSignupProps) {
             By subscribing, you agree to receive the emails you selected. You can unsubscribe at
             any time. See our{' '}
             <Link
-              className="font-semibold text-cyan-300 underline decoration-cyan-400/40 underline-offset-2 hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+              className="theme-link font-semibold underline decoration-fuchsia-300/40 underline-offset-2"
               href="/privacy"
             >
               Privacy Policy

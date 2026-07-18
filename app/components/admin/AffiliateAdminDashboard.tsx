@@ -244,7 +244,7 @@ export function AffiliateAdminDashboard({
   };
 
   return (
-    <main className="min-h-screen bg-[#070a12] px-4 py-8 text-slate-100 sm:px-6">
+    <main className="admin-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
           <div>
@@ -442,7 +442,7 @@ export function AffiliateAdminDashboard({
                         <div
                         className={`rounded-2xl border p-4 transition ${
                           selectedSection?.id === section.id
-                            ? 'border-cyan-400/50 bg-cyan-500/10'
+                            ? 'border-violet-400/50 bg-violet-500/10'
                             : 'border-white/10 bg-black/15'
                         } ${draggedItem?.id === section.id ? 'opacity-45' : ''} ${canDragSections ? 'cursor-grab active:cursor-grabbing' : ''}`}
                         draggable={canDragSections && !busy}
@@ -497,7 +497,7 @@ export function AffiliateAdminDashboard({
                   <div className="mt-5 rounded-3xl border border-white/10 bg-white/[0.04] p-5 sm:p-6">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
-                        <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300">Step 3 · Products</p>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-300">Step 3 · Products</p>
                         <h3 className="mt-2 text-xl font-black">{selectedSection.title}</h3>
                         <p className="mt-1 max-w-2xl text-sm text-slate-400">{selectedSection.description}</p>
                       </div>

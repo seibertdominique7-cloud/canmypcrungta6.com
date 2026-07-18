@@ -129,7 +129,7 @@ export function ScreenshotAnalyzer() {
         </label>
         <button
           type="button"
-          className="flex-1 py-4 px-8 bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-600 disabled:text-slate-300 disabled:hover:bg-slate-600 text-slate-900 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100 hover:shadow-lg hover:shadow-emerald-500/50 disabled:hover:shadow-none disabled:cursor-not-allowed text-center text-lg"
+          className="theme-primary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
           aria-label={SCREENSHOT_UPLOAD_COPY.inputLabel}
           disabled={isAnalyzing}
           onClick={openFilePicker}
@@ -139,7 +139,7 @@ export function ScreenshotAnalyzer() {
 
         <button
           type="button"
-          className="flex-1 py-4 px-8 border-2 border-slate-400 hover:border-slate-200 disabled:border-slate-600 text-slate-200 hover:text-white disabled:text-slate-500 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100 hover:bg-slate-800/50 text-center text-lg"
+          className="theme-secondary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
           aria-label={SCREENSHOT_UPLOAD_COPY.manualEntryLabel}
           disabled={isAnalyzing}
           onClick={startManualEntry}
@@ -149,7 +149,7 @@ export function ScreenshotAnalyzer() {
 
         <a
           href="#download-scanner"
-          className="flex-1 py-4 px-8 text-slate-300 hover:text-white font-bold rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/30 border border-transparent hover:border-blue-400/50 text-center text-lg hover:bg-slate-800/30"
+          className="theme-secondary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
           aria-label={SCREENSHOT_UPLOAD_COPY.scannerLabel}
         >
           {SCREENSHOT_UPLOAD_COPY.scannerButton}
@@ -183,8 +183,8 @@ export function ScreenshotAnalyzer() {
 
 function ScreenshotGuide() {
   return (
-    <details className="group/guide mt-4 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900/45 text-left">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800/50 hover:text-white sm:px-5 [&::-webkit-details-marker]:hidden">
+    <details className="theme-glass-card group/guide mt-4 overflow-hidden rounded-xl text-left">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-fuchsia-400/[0.06] hover:text-white sm:px-5 [&::-webkit-details-marker]:hidden">
         <span>How to get your PC specs</span>
         <span
           className="text-base text-slate-500 transition-transform group-open/guide:rotate-180"
@@ -560,7 +560,7 @@ function ScreenshotUploadPanel({
       {errorMessage ? <FileUploadError id={SCREENSHOT_UPLOAD_ERROR_ID} message={errorMessage} /> : null}
 
       {previewUrl || showAnalysis || isAnalyzing ? (
-        <div className="rounded-xl backdrop-blur-md bg-slate-800/40 border border-slate-700/50 shadow-2xl shadow-blue-500/10 overflow-hidden">
+        <div className={showAnalysis ? 'overflow-hidden rounded-2xl' : 'theme-glass-strong overflow-hidden rounded-2xl'}>
           {showAnalysis ? (
             <>
               <CompatibilityResults
@@ -578,7 +578,7 @@ function ScreenshotUploadPanel({
                       {previewUrl ? (
                         <button
                           type="button"
-                          className="flex-1 rounded-lg border border-slate-600 px-5 py-2.5 text-sm font-bold text-slate-200 transition hover:border-slate-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:text-slate-500"
+                          className="theme-secondary-button flex-1 rounded-lg px-5 py-2.5 text-sm font-bold"
                           aria-label={SCREENSHOT_UPLOAD_COPY.reanalyzeButton}
                           disabled={isAnalyzing}
                           onClick={onAnalyze}
@@ -592,7 +592,7 @@ function ScreenshotUploadPanel({
                       ) : null}
                       <button
                         type="button"
-                        className="flex-1 rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
+                        className="theme-primary-button flex-1 rounded-lg px-5 py-2.5 text-sm font-bold"
                         aria-label="Check another PC"
                         disabled={isAnalyzing}
                         onClick={onReset}
@@ -622,7 +622,7 @@ function ScreenshotUploadPanel({
               <div className="flex flex-col gap-3 border-t border-slate-700/50 p-4 sm:flex-row sm:p-6">
                 <button
                   type="button"
-                  className="flex-1 rounded-lg border-2 border-slate-400 px-6 py-3 text-center font-bold text-slate-200 transition hover:border-slate-200 hover:bg-slate-800/50 hover:text-white disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500"
+                  className="theme-secondary-button flex-1 rounded-lg px-6 py-3 text-center font-bold"
                   aria-label={SCREENSHOT_UPLOAD_COPY.removeButton}
                   disabled={isAnalyzing}
                   onClick={onRemove}
@@ -632,7 +632,7 @@ function ScreenshotUploadPanel({
 
                 <button
                   type="button"
-                  className="flex-1 rounded-lg bg-emerald-500 px-6 py-3 text-center font-bold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+                  className="theme-primary-button flex-1 rounded-lg px-6 py-3 text-center font-bold"
                   aria-label={SCREENSHOT_UPLOAD_COPY.analyzeButton}
                   disabled={!previewUrl || isAnalyzing}
                   onClick={onAnalyze}
@@ -754,7 +754,7 @@ function DetectedSpecsEditor({
                 value={specs[field.key]}
                 placeholder={field.placeholder}
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-700/70 bg-slate-950/50 px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/70 disabled:text-slate-500"
+                className="theme-input w-full rounded-lg px-3 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={field.label}
                 onChange={(event) => onSpecChange(field.key, event.target.value)}
               />
@@ -789,7 +789,7 @@ function StorageFieldsEditor({
             value={specs.storage}
             placeholder="512 GB or 1 TB"
             disabled={disabled}
-            className="w-full rounded-lg border border-slate-700/70 bg-slate-950/50 px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/70 disabled:text-slate-500"
+            className="theme-input w-full rounded-lg px-3 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Storage Capacity"
             onChange={(event) => onSpecChange('storage', event.target.value)}
           />
@@ -806,7 +806,7 @@ function StorageFieldsEditor({
             id="hardware-field-storageType"
             value={specs.storageType}
             disabled={disabled}
-            className="w-full rounded-lg border border-slate-700/70 bg-slate-950/50 px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/70 disabled:text-slate-500"
+            className="theme-input w-full rounded-lg px-3 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Storage Type"
             onChange={(event) => onSpecChange('storageType', event.target.value)}
           >
@@ -905,7 +905,7 @@ function AdvancedDetails({
     <details className="group border-t border-slate-700/50">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 text-left sm:px-6 [&::-webkit-details-marker]:hidden">
         <div>
-          <div className="text-sm font-bold text-emerald-300">
+          <div className="theme-kicker text-sm font-bold">
             {SCREENSHOT_UPLOAD_COPY.advancedTitle}
           </div>
           <div className="mt-0.5 text-xs text-slate-500">
@@ -1028,7 +1028,7 @@ function LoadingSpinner({ label }: LoadingSpinnerProps) {
   return (
     <span className="inline-flex items-center justify-center gap-2">
       <span
-        className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900/30 border-t-slate-900"
+        className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white"
         aria-hidden="true"
       />
       <span>{label}</span>

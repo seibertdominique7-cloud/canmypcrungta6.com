@@ -15,15 +15,15 @@ export default async function UnsubscribeConfirmationPage({
   const confirmation = getConfirmation(status);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4 text-white">
-      <section className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-slate-900/80 p-6 text-center shadow-2xl sm:p-8">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
+    <main className="public-theme flex min-h-screen items-center justify-center px-4">
+      <section className="theme-glass-strong w-full max-w-lg rounded-2xl p-6 text-center sm:p-8">
+        <p className="theme-kicker text-xs font-black uppercase tracking-[0.2em]">
           Email preferences
         </p>
         <h1 className="mt-3 text-3xl font-black tracking-tight">{confirmation.title}</h1>
         <p className="mt-3 text-sm leading-7 text-slate-300">{confirmation.description}</p>
         <Link
-          className="mt-7 inline-flex rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+          className="theme-primary-button mt-7 inline-flex rounded-lg px-5 py-3 text-sm font-black"
           href="/"
         >
           Back to PC checker

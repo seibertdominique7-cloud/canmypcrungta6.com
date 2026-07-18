@@ -93,7 +93,7 @@ export function CompatibilityResults({
     },
   }[result.overall.status];
   return (
-    <section id={sectionId} className="scroll-mt-4 text-left">
+    <section id={sectionId} className="theme-glass-strong scroll-mt-4 overflow-hidden rounded-2xl text-left">
       <div className={`border-b bg-gradient-to-br px-5 py-6 sm:px-7 ${overallStyle.border} ${overallStyle.background}`}>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{title}</p>
         <div className="mt-3 flex items-center gap-3">
@@ -128,7 +128,7 @@ export function CompatibilityResults({
               allowStorageQuickEdit ? (
                 <button
                   type="button"
-                  className="mt-1 text-left text-xs font-semibold leading-relaxed text-emerald-300 underline decoration-emerald-400/50 underline-offset-2 transition hover:text-emerald-200"
+                  className="theme-link mt-1 text-left text-xs font-semibold leading-relaxed underline decoration-fuchsia-300/50 underline-offset-2"
                   aria-expanded={isStorageEditorOpen}
                   onClick={openStorageEditor}
                 >
@@ -153,7 +153,7 @@ export function CompatibilityResults({
                     inputMode="decimal"
                     value={storageCapacityDraft}
                     placeholder="512 GB or 1 TB"
-                    className="w-full rounded-md border border-slate-600 bg-slate-950/70 px-3 py-2 text-sm font-normal text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+                    className="theme-input w-full rounded-md px-3 py-2 text-sm font-normal"
                     onChange={(event) => setStorageCapacityDraft(event.target.value)}
                   />
                 </label>
@@ -162,7 +162,7 @@ export function CompatibilityResults({
                   Storage type
                   <select
                     value={storageTypeDraft}
-                    className="w-full rounded-md border border-slate-600 bg-slate-950/70 px-3 py-2 text-sm font-normal text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+                    className="theme-input w-full rounded-md px-3 py-2 text-sm font-normal"
                     onChange={(event) => setStorageTypeDraft(event.target.value)}
                   >
                     <option value="">Select storage type</option>
@@ -176,7 +176,7 @@ export function CompatibilityResults({
 
                 <button
                   type="submit"
-                  className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-emerald-400"
+                  className="theme-primary-button rounded-md px-4 py-2 text-sm font-bold"
                 >
                   Save
                 </button>

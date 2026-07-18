@@ -53,7 +53,7 @@ export function SpecForm({
     <form
       ref={formRef}
       noValidate
-      className="rounded-2xl border border-slate-700/50 bg-slate-800/40 p-5 shadow-2xl shadow-blue-500/10 backdrop-blur-md sm:p-6"
+      className="theme-glass-strong rounded-2xl p-5 sm:p-6"
       onSubmit={onSubmit}
     >
       <div className="mb-4">
@@ -137,7 +137,7 @@ export function SpecForm({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
           type="submit"
-          className="w-full rounded-lg bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 sm:w-auto"
+          className="theme-primary-button w-full rounded-lg px-5 py-3 text-sm font-bold sm:w-auto"
         >
           {submitLabel}
         </button>
@@ -177,7 +177,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-700/70 bg-slate-950/50 px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
+        className="theme-input w-full rounded-lg px-3 py-3 text-sm"
         onChange={(event) => onChange(event.target.value)}
       />
       <span className="text-xs leading-relaxed text-slate-500">{helperText}</span>
@@ -207,7 +207,7 @@ function SelectField({ label, helperText, value, placeholder, options, onChange 
       <span className="text-sm font-bold text-slate-200">{label}</span>
       <select
         value={value}
-        className="w-full rounded-lg border border-slate-700/70 bg-slate-950/50 px-3 py-3 text-sm text-white outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
+        className="theme-input w-full rounded-lg px-3 py-3 text-sm"
         onChange={(event) => onChange(event.target.value)}
       >
         <option value="">{placeholder}</option>

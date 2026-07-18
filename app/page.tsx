@@ -8,13 +8,7 @@ import {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
-      {/* Subtle background gradient overlay */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-900/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-900/20 rounded-full blur-3xl"></div>
-      </div>
-
+    <div className="public-theme min-h-screen">
       {/* Main content */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
         {/* Header section with headline and subtitle */}
@@ -23,7 +17,7 @@ export default function Home() {
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 tracking-tight leading-tight">
             Can My PC Run
             <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+            <span className="theme-accent-text">
               GTA VI?
             </span>
           </h1>
@@ -35,7 +29,7 @@ export default function Home() {
           </p>
 
           {/* Disclaimer */}
-          <p className="text-sm text-slate-400 italic max-w-2xl">
+          <p className="max-w-2xl rounded-full border border-white/10 bg-slate-950/35 px-4 py-2 text-sm italic text-slate-300 backdrop-blur-sm">
             {'\u26A0\uFE0F'} {getRequirementLabel()}: {getRequirementDisclaimer()}
           </p>
         </header>

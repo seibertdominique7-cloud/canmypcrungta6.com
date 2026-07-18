@@ -29,9 +29,9 @@ export default async function AffiliateAdminLoginPage({
       : null;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4 text-white">
-      <section className="w-full max-w-md rounded-2xl border border-slate-700/60 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/30 sm:p-8">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">
+    <main className="admin-theme flex min-h-screen items-center justify-center px-4">
+      <section className="w-full max-w-md rounded-2xl border border-violet-300/15 bg-slate-950/70 p-6 shadow-2xl shadow-violet-950/25 sm:p-8">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
           Private admin
         </p>
         <h1 className="mt-3 text-3xl font-black tracking-tight">Affiliate links</h1>
@@ -55,13 +55,13 @@ export default async function AffiliateAdminLoginPage({
               required
               autoComplete="current-password"
               disabled={Boolean(configurationError)}
-              className="rounded-lg border border-slate-700 bg-slate-950/70 px-4 py-3 font-normal text-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:opacity-50"
+              className="theme-input rounded-lg px-4 py-3 font-normal disabled:opacity-50"
             />
           </label>
           <button
             type="submit"
             disabled={Boolean(configurationError)}
-            className="rounded-lg bg-emerald-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600"
+            className="rounded-lg bg-violet-500 px-5 py-3 text-sm font-black text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:bg-slate-600"
           >
             Sign in
           </button>

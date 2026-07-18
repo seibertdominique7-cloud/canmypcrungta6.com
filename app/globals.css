@@ -1,8 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #070d20;
+  --background-elevated: #0b1530;
+  --card: rgb(12 22 48 / 82%);
+  --card-strong: rgb(8 16 36 / 94%);
+  --border: rgb(216 180 254 / 22%);
+  --text-primary: #f8fafc;
+  --text-muted: #a8b2c7;
+  --accent-pink: #ec4899;
+  --accent-purple: #7c3aed;
+  --accent-orange: #fb923c;
+  --success: #2dd4bf;
+  --warning: #fbbf24;
+  --error: #fb7185;
+  --shadow-accent: 0 22px 70px rgb(76 29 149 / 26%);
+  --foreground: var(--text-primary);
 }
 
 @theme inline {
@@ -12,15 +25,161 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  color-scheme: dark;
+}
+
+::selection {
+  background: rgb(236 72 153 / 42%);
+  color: white;
+}
+
+.public-theme {
+  background-color: var(--background);
+  background-image:
+    linear-gradient(180deg, rgb(4 8 24 / 64%) 0%, rgb(7 13 32 / 78%) 48%, rgb(7 13 32 / 96%) 100%),
+    url('/images/SiteTheme.png');
+  background-position: center top, center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+  color: var(--text-primary);
+}
+
+.admin-theme {
+  background:
+    radial-gradient(circle at 85% 0%, rgb(124 58 237 / 13%), transparent 34rem),
+    linear-gradient(180deg, var(--background-elevated), var(--background));
+  color: var(--text-primary);
+}
+
+.theme-glass-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgb(19 31 65 / 84%), var(--card));
+  box-shadow: var(--shadow-accent);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
+.theme-glass-strong {
+  border: 1px solid rgb(216 180 254 / 24%);
+  background: linear-gradient(150deg, rgb(17 28 59 / 97%), var(--card-strong));
+  box-shadow: 0 26px 80px rgb(2 6 23 / 48%), var(--shadow-accent);
+  -webkit-backdrop-filter: blur(20px) saturate(125%);
+  backdrop-filter: blur(20px) saturate(125%);
+}
+
+.theme-kicker {
+  color: #f9a8d4;
+}
+
+.theme-accent-text {
+  background-image: linear-gradient(100deg, #fb7185 0%, var(--accent-pink) 42%, #a78bfa 100%);
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+}
+
+.theme-primary-button {
+  border: 1px solid rgb(251 113 133 / 28%);
+  background-image: linear-gradient(115deg, var(--accent-pink), #d946ef 48%, var(--accent-purple));
+  color: white;
+  box-shadow: 0 12px 30px rgb(190 24 93 / 25%);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.theme-primary-button:hover {
+  filter: brightness(1.1) saturate(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 38px rgb(190 24 93 / 34%);
+}
+
+.theme-primary-button:active {
+  transform: translateY(0);
+}
+
+.theme-primary-button:focus-visible,
+.theme-secondary-button:focus-visible,
+.theme-input:focus-visible,
+.theme-link:focus-visible {
+  outline: 2px solid #f9a8d4;
+  outline-offset: 3px;
+}
+
+.theme-primary-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  opacity: 0.5;
+  transform: none;
+}
+
+.theme-secondary-button {
+  border: 1px solid rgb(196 181 253 / 32%);
+  background: rgb(76 29 149 / 22%);
+  color: #ede9fe;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.theme-secondary-button:hover {
+  border-color: rgb(244 114 182 / 56%);
+  background: rgb(107 33 168 / 34%);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.theme-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.theme-input {
+  border: 1px solid rgb(196 181 253 / 24%);
+  background: rgb(3 7 24 / 70%);
+  color: var(--text-primary);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.theme-input::placeholder {
+  color: #64748b;
+}
+
+.theme-input:focus {
+  border-color: rgb(244 114 182 / 72%);
+  background: rgb(3 7 24 / 86%);
+  box-shadow: 0 0 0 3px rgb(236 72 153 / 15%);
+  outline: none;
+}
+
+.theme-link {
+  color: #f0abfc;
+  transition: color 180ms ease;
+}
+
+.theme-link:hover {
+  color: #fbcfe8;
+}
+
+@media (max-width: 768px) {
+  .public-theme {
+    background-attachment: scroll;
+    background-position: center top, 62% top;
+    background-size: cover, auto 56rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-primary-button,
+  .theme-secondary-button {
+    transition: none;
+  }
+
+  .theme-primary-button:hover,
+  .theme-secondary-button:hover {
+    transform: none;
+  }
 }

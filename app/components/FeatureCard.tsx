@@ -9,8 +9,8 @@ interface FeatureCardProps {
  */
 export function FeatureCard({ icon, title, description }: FeatureCardProps) {
   return (
-    <div className="group relative p-8 rounded-xl backdrop-blur-md bg-slate-800/40 border border-slate-700/50 hover:border-slate-600 transition-all duration-500 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/10">
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-transparent pointer-events-none"></div>
+    <div className="theme-glass-card group relative rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-fuchsia-300/35 hover:shadow-2xl hover:shadow-fuchsia-950/25">
+      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-fuchsia-400/[0.06] via-violet-400/[0.035] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
 
       <div className="relative z-10 flex flex-col gap-4">
         <span className="text-5xl mb-2 block transform group-hover:scale-110 transition-transform duration-300">
@@ -22,7 +22,7 @@ export function FeatureCard({ icon, title, description }: FeatureCardProps) {
         <p className="text-slate-300 leading-relaxed text-base">{description}</p>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-full"></div>
+      <div className="absolute bottom-0 left-5 right-5 h-px rounded-full bg-gradient-to-r from-transparent via-fuchsia-300/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
     </div>
   );
 }

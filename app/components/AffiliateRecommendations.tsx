@@ -243,15 +243,15 @@ function RecommendationSection({
   const hasMore = open && productsToRender.length < section.products.length;
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.055] to-white/[0.025] shadow-xl shadow-black/10">
+    <section className="theme-glass-card overflow-hidden rounded-3xl">
       <button
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-white/[0.025] sm:p-6"
+        className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-fuchsia-400/[0.045] sm:p-6"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         <span>
-          <span className="block text-xs font-black uppercase tracking-[0.17em] text-violet-300">
+          <span className="theme-kicker block text-xs font-black uppercase tracking-[0.17em]">
             Recommended for this result
           </span>
           <span className="mt-1 block text-xl font-black text-white">{section.title}</span>
@@ -273,7 +273,7 @@ function RecommendationSection({
           </div>
           {hasMore ? (
             <button
-              className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/10"
+              className="theme-secondary-button mt-4 rounded-xl px-4 py-2 text-sm font-bold"
               onClick={() => setShowAll(true)}
               type="button"
             >
@@ -303,8 +303,8 @@ function PrebuiltRecommendationSection({
   if (products.length === 0) return null;
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/[0.025] p-4 shadow-lg shadow-black/10 sm:p-5">
-      <p className="text-xs font-black uppercase tracking-[0.17em] text-cyan-300">
+    <section className="theme-glass-card rounded-3xl p-4 sm:p-5">
+      <p className="theme-kicker text-xs font-black uppercase tracking-[0.17em]">
         Complete systems
       </p>
       <h2 className="mt-1 text-xl font-black text-white">Prefer a Complete Gaming PC?</h2>
@@ -335,8 +335,8 @@ function GamePurchaseRecommendationSection({
   if (products.length === 0) return null;
 
   return (
-    <section className="rounded-3xl border border-violet-400/20 bg-gradient-to-br from-violet-500/[0.08] to-fuchsia-500/[0.035] p-4 shadow-xl shadow-black/10 sm:p-5">
-      <p className="text-xs font-black uppercase tracking-[0.17em] text-violet-300">
+    <section className="theme-glass-card rounded-3xl p-4 sm:p-5">
+      <p className="theme-kicker text-xs font-black uppercase tracking-[0.17em]">
         Purchase links
       </p>
       <h2 className="mt-1 text-xl font-black text-white">Ready for GTA VI?</h2>
@@ -354,7 +354,7 @@ function GamePurchaseRecommendationSection({
 
 function AffiliateDisclosure() {
   return (
-    <p className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2 text-xs leading-5 text-slate-400">
+    <p className="rounded-xl border border-violet-200/10 bg-slate-950/35 px-3 py-2 text-xs leading-5 text-slate-300">
       Disclosure: We may earn a commission when you purchase through links on this page, at no
       additional cost to you.
     </p>

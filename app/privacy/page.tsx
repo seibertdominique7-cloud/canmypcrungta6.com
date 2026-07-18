@@ -8,9 +8,9 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4 py-12 text-white sm:px-6">
-      <article className="mx-auto max-w-3xl rounded-2xl border border-slate-700/60 bg-slate-900/70 p-6 shadow-2xl sm:p-9">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
+    <main className="public-theme min-h-screen px-4 py-12 sm:px-6">
+      <article className="theme-glass-strong mx-auto max-w-3xl rounded-2xl p-6 sm:p-9">
+        <p className="theme-kicker text-xs font-black uppercase tracking-[0.2em]">
           Site information
         </p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Privacy Policy</h1>
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
 
         <Link
           href="/"
-          className="mt-8 inline-flex rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+          className="theme-primary-button mt-8 inline-flex rounded-lg px-4 py-2.5 text-sm font-black"
         >
           Back to PC checker
         </Link>

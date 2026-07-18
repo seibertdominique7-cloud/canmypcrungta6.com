@@ -28,14 +28,14 @@ export function RecommendationProductCard({
   const buttonText = getPublicButtonText(product.buttonText, product.retailer);
   const retailerLabel = product.retailer === 'Other' ? 'Retailer link' : product.retailer;
   const callToActionClass =
-    'group/cta inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-violet-950/40 transition hover:from-violet-400 hover:to-fuchsia-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300';
+    'theme-primary-button group/cta inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-black';
 
   return (
     <article
-      className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111827] to-[#080b13] shadow-xl shadow-black/25 transition duration-300 hover:-translate-y-1 hover:border-violet-400/35 hover:shadow-2xl hover:shadow-violet-950/35 ${compact ? 'min-h-[22rem]' : 'min-h-[24rem]'}`}
+      className={`theme-glass-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-3xl transition duration-300 hover:-translate-y-1 hover:border-fuchsia-300/40 hover:shadow-2xl hover:shadow-fuchsia-950/30 ${compact ? 'min-h-[22rem]' : 'min-h-[24rem]'}`}
     >
       <div
-        className={`relative overflow-hidden border-b border-white/10 bg-gradient-to-br from-violet-950/55 via-slate-900 to-cyan-950/45 ${compact ? 'aspect-[16/7]' : 'aspect-[16/10]'}`}
+        className={`relative overflow-hidden border-b border-violet-200/10 bg-gradient-to-br from-fuchsia-950/35 via-slate-950 to-violet-950/50 ${compact ? 'aspect-[16/7]' : 'aspect-[16/10]'}`}
       >
         <ProductImagePlaceholder
           componentType={product.componentType}
@@ -46,7 +46,7 @@ export function RecommendationProductCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             alt={`${product.title} product`}
-            className="absolute inset-0 h-full w-full bg-slate-950/70 object-contain p-4 transition duration-500 group-hover:scale-[1.045] sm:p-5"
+            className="absolute inset-0 h-full w-full bg-slate-950/65 object-contain p-4 transition duration-500 group-hover:scale-[1.045] sm:p-5"
             loading="lazy"
             onError={(event) => {
               event.currentTarget.style.display = 'none';
@@ -72,7 +72,7 @@ export function RecommendationProductCard({
 
       <div className={`flex flex-1 flex-col ${compact ? 'p-4 sm:p-5' : 'p-5'}`}>
         {categoryLabel ? (
-          <p className="mb-2 text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">
+          <p className="theme-kicker mb-2 text-[10px] font-black uppercase tracking-[0.16em]">
             {categoryLabel}
           </p>
         ) : null}
@@ -83,7 +83,7 @@ export function RecommendationProductCard({
             {product.title || 'Product title'}
           </h3>
           {product.platform ? (
-            <span className="shrink-0 rounded-lg bg-cyan-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-cyan-300">
+            <span className="shrink-0 rounded-lg bg-violet-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200">
               {product.platform}
             </span>
           ) : null}
@@ -150,7 +150,7 @@ function ProductImagePlaceholder({
       className="absolute inset-0 flex items-center justify-center px-6 text-center"
     >
       <div>
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-slate-300 shadow-inner">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-fuchsia-200/15 bg-fuchsia-400/[0.07] text-fuchsia-100 shadow-inner">
           <svg aria-hidden="true" className="h-6 w-6" fill="none" viewBox="0 0 24 24">
             <path
               d="M5 7.5h14v9H5zM8 4.5h8l1.5 3h-11zM8.5 19.5h7"
@@ -190,7 +190,7 @@ function getPublicButtonText(
 
 function badgeClass(badge: AffiliateProductRecord['badge']) {
   if (badge === 'Best Value') return 'border-emerald-300/30 bg-emerald-400/90 text-emerald-950';
-  if (badge === 'Budget Pick') return 'border-cyan-300/30 bg-cyan-300/90 text-cyan-950';
+  if (badge === 'Budget Pick') return 'border-orange-300/30 bg-orange-300/90 text-orange-950';
   if (badge === 'Performance Pick') return 'border-violet-300/30 bg-violet-400/90 text-violet-950';
   if (badge === 'Premium Pick') return 'border-amber-200/30 bg-amber-300/90 text-amber-950';
   return 'border-fuchsia-300/30 bg-fuchsia-400/90 text-fuchsia-950';
