@@ -25,7 +25,11 @@ import {
   type EditableHardwareSpecs,
   type HardwareFieldKey,
 } from '../lib/hardware-types';
-import { parseHardwareSpecs } from '../lib/hardware-parser';
+import {
+  parseHardwareSpecs,
+  type HardwareParseResult,
+} from '../lib/hardware-parser';
+import { parseCapacityGb } from '../lib/capacity';
 import {
   isManualStorageType,
   MANUAL_STORAGE_TYPES,
@@ -402,6 +406,10 @@ function useScreenshotAnalysis() {
       const parsedHardware = parseHardwareSpecs(text);
       const parsedEditableSpecs = detectedToEditableSpecs(parsedHardware.specs);
 
+      if (process.env.NODE_ENV === 'development') {
+        logRamPipeline(parsedHardware, parsedEditableSpecs);
+      }
+
       if (isCurrentRun()) {
         setOcrProgress(100);
         setDetectedText(parsedHardware.rawOcrText);
@@ -489,6 +497,39 @@ function useScreenshotAnalysis() {
     updateEditableSpec,
     saveManualStorage,
   };
+}
+
+function logRamPipeline(
+  parsedHardware: HardwareParseResult,
+  editableSpecs: EditableHardwareSpecs,
+) {
+  const compatibility = evaluateCompatibility(editableSpecs, parsedHardware.specs);
+  const resultRam = compatibility.components.find((component) => component.key === 'ram');
+  const { ramTrace } = parsedHardware;
+
+  console.info('[RAM pipeline] 1. OCR output', ramTrace.rawOcrLine);
+  console.info('[RAM pipeline] 2. OCR post-processing', ramTrace.postProcessedLine);
+  console.info('[RAM pipeline] 3. Text normalization', ramTrace.normalizedLine);
+  console.info(
+    '[RAM pipeline] 4. Regex extraction',
+    ramTrace.regexMatch ? JSON.stringify(ramTrace.regexMatch) : null,
+  );
+  console.info('[RAM pipeline] 5. Numeric parsing', ramTrace.parsedNumber);
+  console.info('[RAM pipeline] 6. Unit parsing (GB)', ramTrace.numericGb);
+  console.info('[RAM pipeline] 7. Component matching', ramTrace.componentValue);
+  console.info(
+    '[RAM pipeline] 8. Detected specs state',
+    JSON.stringify(parsedHardware.specs.ram),
+  );
+  console.info('[RAM pipeline] 9. Editable form state', editableSpecs.ram);
+  console.info(
+    '[RAM pipeline] 10. Compatibility engine input',
+    JSON.stringify({
+      displayValue: editableSpecs.ram,
+      numericGb: parseCapacityGb(editableSpecs.ram),
+    }),
+  );
+  console.info('[RAM pipeline] 11. Results display', resultRam?.detected ?? '');
 }
 
 type OcrWorker = {

@@ -7,10 +7,13 @@ import { EmailSignup } from '../EmailSignup';
 import { RecommendationProductCard } from '../RecommendationProductCard';
 import { ArticleMiddleAd, ArticleTopAd } from '../ads/AdPlacements';
 import type { AffiliateProductRecord } from '../../lib/affiliate-types';
+import { isRichTextBody } from '../../lib/rich-text-shared';
+import { parseRichTextSegments } from '../../lib/rich-text';
 
 type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
 type ImageBlock = { kind: 'image'; url: string; alt: string; caption: string; align: 'left' | 'center' | 'right' | 'full'; size: 'small' | 'medium' | 'large' | 'full'; link: string };
 type Block =
+  | { kind: 'rich-html'; html: string }
   | { kind: 'heading'; level: number; text: string }
   | { kind: 'paragraph' | 'quote'; text: string }
   | { kind: 'code'; text: string }
@@ -53,11 +56,22 @@ export function extractFaqItems(body: string) {
 }
 
 export function estimateReadingTime(body: string) {
-  const words = body.replace(/:::[\s\S]*?:::/g, ' ').match(/[\p{L}\p{N}']+/gu)?.length ?? 0;
+  const words = body.replace(/:::[\s\S]*?:::/g, ' ').replace(/<[^>]+>/g, ' ').match(/[\p{L}\p{N}']+/gu)?.length ?? 0;
   return Math.max(1, Math.ceil(words / 220));
 }
 
 function parseContent(body: string): Block[] {
+  if (isRichTextBody(body)) {
+    const richBlocks = parseRichTextSegments(body).flatMap<Block>((segment): Block[] => {
+      if (segment.kind === 'html') return [{ kind: 'rich-html' as const, html: segment.html }];
+      if (segment.kind === 'affiliate') return [{ kind: 'affiliate' as const, argument: segment.productId, text: '' }];
+      if (['callout', 'faq', 'email-signup', 'ad', 'checker'].includes(segment.blockKind)) {
+        return [{ kind: segment.blockKind as CustomBlock['kind'], argument: segment.argument, text: segment.text }];
+      }
+      return [];
+    });
+    return moveEarlyMonetization(richBlocks);
+  }
   const lines = body.replace(/\r\n?/g, '\n').split('\n');
   const blocks: Block[] = [];
   let index = 0;
@@ -110,6 +124,15 @@ function moveEarlyMonetization(blocks: Block[]) {
 
 function renderBlock(block: Block, index: number, products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>, siteContent: Record<string, string>) : ReactNode {
   const key = `${block.kind}-${index}`;
+  if (block.kind === 'rich-html') {
+    return (
+      <div
+        className="cms-rich-content grid gap-5 [&_a]:font-bold [&_a]:text-violet-300 [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-5 [&_blockquote]:py-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-emerald-200 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-slate-500 [&_figure]:mx-auto [&_figure]:my-5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-white [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:text-white [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-black [&_h3]:text-white [&_h4]:mt-4 [&_h4]:text-lg [&_h4]:font-black [&_h4]:text-white [&_hr]:border-white/10 [&_img]:max-h-[720px] [&_img]:w-full [&_img]:rounded-2xl [&_img]:object-contain [&_li]:ml-6 [&_ol]:list-decimal [&_ol]:space-y-2 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:border [&_pre]:border-white/10 [&_pre]:bg-black/50 [&_pre]:p-4 [&_pre_code]:bg-transparent [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:p-3 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:p-3 [&_ul]:list-disc [&_ul]:space-y-2"
+        dangerouslySetInnerHTML={{ __html: block.html }}
+        key={key}
+      />
+    );
+  }
   if (block.kind === 'heading') {
     const Tag = `h${Math.min(6, Math.max(2, block.level + 1))}` as 'h2';
     return <Tag className="mt-5 text-balance text-2xl font-black text-white" key={key}>{inline(block.text)}</Tag>;

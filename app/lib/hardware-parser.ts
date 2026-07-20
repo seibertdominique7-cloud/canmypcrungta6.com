@@ -4,6 +4,7 @@ import {
   type DetectedHardwareSpecs,
   type HardwareFieldKey,
 } from './hardware-types';
+import { parseCapacity, type ParsedCapacity } from './capacity';
 
 interface FieldCandidate {
   displayValue: string;
@@ -14,9 +15,24 @@ interface FieldCandidate {
 export interface HardwareParseResult {
   rawOcrText: string;
   normalizedOcrText: string;
+  ramTrace: RamExtractionTrace;
   specs: DetectedHardwareSpecs;
   detectedFieldCount: number;
   hasUsefulText: boolean;
+}
+
+export interface RamExtractionTrace {
+  rawOcrLine: string | null;
+  postProcessedLine: string | null;
+  normalizedLine: string | null;
+  regexMatch: {
+    matchedText: string;
+    rawAmount: string;
+    unit: string;
+  } | null;
+  parsedNumber: number | null;
+  numericGb: number | null;
+  componentValue: string;
 }
 
 const CONFIDENCE_RANK: Record<ConfidenceLevel, number> = {
@@ -56,18 +72,17 @@ const RAM_LABEL_PATTERNS = [
   /^Memory\b/i,
 ];
 
-const CAPACITY_PATTERN = /(\d+(?:[.,]\d+)?)\s*(GB|MB|TB)/i;
-
 export function parseHardwareSpecs(ocrText: string): HardwareParseResult {
   const text = normalizeOcrText(ocrText);
   const lines = getUsefulLines(text);
   const specs = createEmptyDetectedSpecs();
+  const ramExtraction = extractRam(ocrText, lines);
 
   setField(specs, 'manufacturer', extractManufacturer(lines));
   setField(specs, 'model', extractModel(lines));
   setField(specs, 'cpu', extractCpu(text, lines));
   setField(specs, 'gpu', extractGpu(text, lines));
-  setField(specs, 'ram', extractRam(lines));
+  setField(specs, 'ram', ramExtraction.field);
   setField(specs, 'windowsVersion', extractWindowsVersion(text, lines));
 
   const storage = extractStorage(lines);
@@ -79,6 +94,7 @@ export function parseHardwareSpecs(ocrText: string): HardwareParseResult {
   return {
     rawOcrText: ocrText,
     normalizedOcrText: text,
+    ramTrace: ramExtraction.trace,
     specs,
     detectedFieldCount,
     hasUsefulText: text.length >= 40 && detectedFieldCount >= 2,
@@ -232,14 +248,18 @@ function extractGpu(text: string, lines: string[]) {
   return null;
 }
 
-function extractRam(lines: string[]) {
+function extractRam(rawOcrText: string, lines: string[]) {
   const preferredLine = findLabeledLine(lines, RAM_LABEL_PATTERNS);
 
   if (preferredLine) {
     const capacity = extractCapacity(preferredLine);
 
     if (capacity) {
-      return candidate(capacity.displayValue, 'high', capacity.numericGb);
+      const field = candidate(capacity.displayValue, 'high', capacity.numericGb);
+      return {
+        field,
+        trace: createRamTrace(rawOcrText, preferredLine, capacity, field),
+      };
     }
   }
 
@@ -248,13 +268,20 @@ function extractRam(lines: string[]) {
   );
 
   if (!memoryLine) {
-    return null;
+    return {
+      field: null,
+      trace: createRamTrace(rawOcrText, preferredLine, null, null),
+    };
   }
 
   const capacity = extractCapacity(memoryLine);
-  return capacity
+  const field = capacity
     ? candidate(capacity.displayValue, 'medium', capacity.numericGb)
     : null;
+  return {
+    field,
+    trace: createRamTrace(rawOcrText, memoryLine, capacity, field),
+  };
 }
 
 function extractStorage(lines: string[]) {
@@ -269,7 +296,13 @@ function extractStorage(lines: string[]) {
     }))
     .filter((item) => item.capacity !== null || item.type !== null);
   const largestCapacity = storageCandidates
-    .filter((item): item is { line: string; capacity: Capacity; type: StorageKind | null } => item.capacity !== null)
+    .filter(
+      (item): item is {
+        line: string;
+        capacity: ParsedCapacity;
+        type: StorageKind | null;
+      } => item.capacity !== null,
+    )
     .sort((left, right) => right.capacity.numericGb - left.capacity.numericGb)[0];
   const storageType = detectStorageType(lines.join(' '));
 
@@ -354,44 +387,43 @@ function normalizeGpuName(value: string) {
   return cleaned;
 }
 
-interface Capacity {
-  displayValue: string;
-  numericGb: number;
+function extractCapacity(line: string) {
+  return parseCapacity(line);
 }
 
-function extractCapacity(line: string): Capacity | null {
-  const match = line.match(CAPACITY_PATTERN);
-
-  if (!match) {
-    return null;
-  }
-
-  const rawAmount = match[1];
-  const amount = Number.parseFloat(rawAmount.replace(',', '.'));
-  const unit = match[2].toUpperCase();
-
-  if (!Number.isFinite(amount)) {
-    return null;
-  }
-
-  if (unit === 'TB') {
-    return {
-      displayValue: `${rawAmount} ${unit}`,
-      numericGb: amount * 1024,
-    };
-  }
-
-  if (unit === 'MB') {
-    return {
-      displayValue: `${rawAmount} ${unit}`,
-      numericGb: amount / 1024,
-    };
-  }
+function createRamTrace(
+  rawOcrText: string,
+  normalizedLine: string | null,
+  capacity: ParsedCapacity | null,
+  field: FieldCandidate | null,
+): RamExtractionTrace {
+  const rawOcrLine = normalizedLine ? findRawSourceLine(rawOcrText, normalizedLine) : null;
 
   return {
-    displayValue: `${rawAmount} ${unit}`,
-    numericGb: amount,
+    rawOcrLine,
+    postProcessedLine: rawOcrLine ? normalizeOcrText(rawOcrLine) : null,
+    normalizedLine,
+    regexMatch: capacity
+      ? {
+          matchedText: capacity.matchedText,
+          rawAmount: capacity.rawAmount,
+          unit: capacity.unit,
+        }
+      : null,
+    parsedNumber: capacity?.numericAmount ?? null,
+    numericGb: capacity?.numericGb ?? null,
+    componentValue: field?.displayValue ?? '',
   };
+}
+
+function findRawSourceLine(rawOcrText: string, normalizedLine: string) {
+  return (
+    rawOcrText
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .find((line) => cleanValue(normalizeOcrText(line)) === normalizedLine)
+      ?.trim() ?? normalizedLine
+  );
 }
 
 type StorageKind = 'hdd' | 'ssd' | 'nvme' | 'unknown';

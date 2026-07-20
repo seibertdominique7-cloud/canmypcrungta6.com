@@ -12,6 +12,7 @@ import {
   type HardwareFieldKey,
 } from './hardware-types';
 import { isManualStorageType, parseManualStorageCapacity } from './manual-storage';
+import { parseCapacity } from './capacity';
 
 export interface ManualEntryInput {
   cpu: string;
@@ -27,7 +28,6 @@ export interface NormalizedManualEntry {
   errors: string[];
 }
 
-const MANUAL_RAM_PATTERN = /^(\d+(?:[.,]\d+)?)\s*(GB)$/i;
 const minimumRequirements = getMinimumRequirements();
 const recommendedRequirements = getRecommendedRequirements();
 
@@ -160,25 +160,18 @@ function normalizeRamValue(value: string) {
     return '';
   }
 
-  const match = value.match(MANUAL_RAM_PATTERN);
+  const parsed = parseManualRam(value);
 
-  if (!match) {
+  if (!parsed) {
     return null;
   }
 
-  return `${match[1]} GB`;
+  return parsed.displayValue;
 }
 
 function getNumericGb(key: HardwareFieldKey, displayValue: string) {
   if (key === 'ram') {
-    const match = displayValue.match(MANUAL_RAM_PATTERN);
-
-    if (!match) {
-      return null;
-    }
-
-    const amount = Number.parseFloat(match[1].replace(',', '.'));
-    return Number.isFinite(amount) ? amount : null;
+    return parseManualRam(displayValue)?.numericGb ?? null;
   }
 
   if (key === 'storage') {
@@ -187,4 +180,15 @@ function getNumericGb(key: HardwareFieldKey, displayValue: string) {
   }
 
   return null;
+}
+
+function parseManualRam(value: string) {
+  const trimmed = value.trim();
+  const parsed = parseCapacity(trimmed);
+
+  if (!parsed || parsed.unit !== 'GB' || parsed.matchedText.length !== trimmed.length) {
+    return null;
+  }
+
+  return parsed;
 }

@@ -17,6 +17,7 @@ import type {
   SiteContentRecord,
 } from './cms-types';
 import type { ArticleInput, PageInput } from './cms-validation';
+import type { AffiliateRetailer, ProductComponentType } from './affiliate-types';
 import { createSlug, validatePath } from './cms-validation';
 import { AdminDataError } from './admin-data-error';
 import { validateExternalImageUrl } from './media-validation';
@@ -42,7 +43,20 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
     prisma.contentTag.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { articles: true } } } }),
     prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' }, include: { folder: true } }),
     prisma.mediaFolder.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { media: true } } } }),
-    prisma.product.findMany({ orderBy: { title: 'asc' }, select: { id: true, title: true, enabled: true } }),
+    prisma.product.findMany({
+      orderBy: { title: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        enabled: true,
+        retailer: true,
+        affiliateUrl: true,
+        imageUrl: true,
+        defaultPriceText: true,
+        shortDescription: true,
+        componentType: true,
+      },
+    }),
     prisma.contentRevision.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
   return {
@@ -52,7 +66,12 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
     tags: tags.map(serializeTag),
     media: await Promise.all(media.map(serializeMedia)),
     mediaFolders: mediaFolders.map(serializeMediaFolder),
-    affiliateProducts,
+    affiliateProducts: affiliateProducts.map(({ defaultPriceText, ...product }) => ({
+      ...product,
+      retailer: product.retailer as AffiliateRetailer,
+      componentType: product.componentType as ProductComponentType,
+      priceText: defaultPriceText,
+    })),
   };
 }
 

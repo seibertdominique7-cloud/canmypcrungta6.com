@@ -1,3 +1,5 @@
+import type { AffiliateRetailer, ProductComponentType } from './affiliate-types';
+
 export const CONTENT_STATUSES = ['draft', 'published', 'scheduled', 'archived'] as const;
 export const ARTICLE_CONTENT_TYPES = ['standard', 'news', 'hardware-guide', 'comparison', 'faq', 'deals', 'tutorial'] as const;
 export const PAGE_TEMPLATES = ['standard', 'landing-page', 'legal', 'contact', 'faq', 'deals'] as const;
@@ -172,5 +174,15 @@ export interface ContentWorkspace {
   tags: ContentTagRecord[];
   media: MediaAssetRecord[];
   mediaFolders: MediaFolderRecord[];
-  affiliateProducts: Array<{ id: string; title: string; enabled: boolean }>;
+  affiliateProducts: Array<{
+    id: string;
+    title: string;
+    enabled: boolean;
+    retailer: AffiliateRetailer;
+    affiliateUrl: string;
+    imageUrl: string | null;
+    priceText: string;
+    shortDescription: string;
+    componentType: ProductComponentType;
+  }>;
 }

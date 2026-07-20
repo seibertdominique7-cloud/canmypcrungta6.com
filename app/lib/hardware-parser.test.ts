@@ -10,6 +10,7 @@ describe('parseHardwareSpecs capacity parsing', () => {
     ['16.0', '16.0 GB', 16],
     ['8.0', '8.0 GB', 8],
     ['64.0', '64.0 GB', 64],
+    ['128.0', '128.0 GB', 128],
     ['16,0', '16,0 GB', 16],
   ])(
     'parses Installed Physical Memory (RAM) %s GB as %s',
@@ -83,6 +84,30 @@ describe('parseHardwareSpecs capacity parsing', () => {
     });
     expect(editableSpecs.ram).toBe('32.0 GB');
     expect(displayedRam?.detected).toBe('32.0 GB');
+    expect(parsed.ramTrace).toEqual({
+      rawOcrLine: 'Installed Physical Memory (RAM) 32.0 GB',
+      postProcessedLine: 'Installed Physical Memory (RAM) 32.0 GB',
+      normalizedLine: 'Installed Physical Memory (RAM) 32.0 GB',
+      regexMatch: {
+        matchedText: '32.0 GB',
+        rawAmount: '32.0',
+        unit: 'GB',
+      },
+      parsedNumber: 32,
+      numericGb: 32,
+      componentValue: '32.0 GB',
+    });
+  });
+
+  it.each([
+    ['Installed RAM: 32.0 GB', '32.0 GB', 32],
+    ['Memory 32,0 GB', '32,0 GB', 32],
+    ['Total Physical Memory 32,768 MB', '32,768 MB', 32],
+    ['Memory: 32768 MB RAM', '32768 MB', 32],
+  ])('extracts locale-safe RAM from %s', (rawOcrText, displayValue, numericGb) => {
+    const result = parseHardwareSpecs(rawOcrText);
+
+    expect(result.specs.ram).toMatchObject({ displayValue, numericGb });
   });
 });
 

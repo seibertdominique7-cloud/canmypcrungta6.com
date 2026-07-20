@@ -14,6 +14,7 @@ import {
   type EditableHardwareSpecs,
   type HardwareFieldKey,
 } from './hardware-types';
+import { parseCapacityGb } from './capacity';
 
 export type ComponentStatus = 'recommended' | 'minimum' | 'below' | 'unknown';
 
@@ -434,31 +435,6 @@ function requirementTier(
 
   // Requirement alternatives are an OR condition, so the lower calibrated tier is the floor.
   return Math.min(...tiers);
-}
-
-function parseCapacityGb(value: string) {
-  const match = value.match(/(\d+(?:[.,]\d+)?)\s*(TB|GB|MB)\b/i);
-
-  if (!match) {
-    return null;
-  }
-
-  const amount = Number.parseFloat(match[1].replace(',', '.'));
-  const unit = match[2].toUpperCase();
-
-  if (!Number.isFinite(amount)) {
-    return null;
-  }
-
-  if (unit === 'TB') {
-    return amount * 1024;
-  }
-
-  if (unit === 'MB') {
-    return amount / 1024;
-  }
-
-  return amount;
 }
 
 function detectStorageKind(value: string) {

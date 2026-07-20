@@ -1,3 +1,5 @@
+'use client';
+
 import type { AffiliateProductRecord } from '../lib/affiliate-types';
 
 type RecommendationCardProduct = Pick<
