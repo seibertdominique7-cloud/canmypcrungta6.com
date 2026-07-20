@@ -1,0 +1,1 @@
+import { TaxonomyAdminDashboard } from '../../components/admin/TaxonomyAdminDashboard'; import { requireAdminPage } from '../../lib/admin-auth'; import { getTags } from '../../lib/cms-data'; export const dynamic = 'force-dynamic'; export default async function Page() { await requireAdminPage(); return <TaxonomyAdminDashboard kind="tag" initialItems={await getTags()} />; }

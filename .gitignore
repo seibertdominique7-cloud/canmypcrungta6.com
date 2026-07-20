@@ -45,6 +45,7 @@ yarn-error.log*
 /.codex-*.db-journal
 /.codex-*.log
 /generated/prisma
+/public/uploads/
 
 # vercel
 .vercel

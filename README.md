@@ -1,6 +1,8 @@
 # GTA VI PC Checker
 
 The app supports screenshot OCR and manual PC-spec entry through one shared compatibility engine.
+The private admin also manages recommendations, subscribers, articles, pages, taxonomies, media,
+site labels, and redirects.
 It also includes a private recommendation manager organized as compatibility scenario → editable
 section → affiliate product.
 
@@ -29,7 +31,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 2. Set `ADMIN_PASSWORD` to a strong private password.
 3. Set `SESSION_SECRET` to a long random value of at least 32 characters.
 4. Restart `npm run dev` after changing environment variables.
-5. Open [http://localhost:3000/admin/products](http://localhost:3000/admin/products) for the reusable product catalog, or `/admin/recommendations` for scenario assignments.
+5. Open [http://localhost:3000/admin](http://localhost:3000/admin). The dashboard links to recommendations, subscribers, and every content-management section.
 
 Generate a session secret in PowerShell:
 
@@ -39,6 +41,18 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 
 Keep `.env.local` private. It is ignored by Git and must never be exposed through
 `NEXT_PUBLIC_` environment variables.
+
+## Content management
+
+The private admin includes Articles, Pages, Categories, Tags, Media, Site Content, and Redirects.
+Sample articles are seeded as drafts only when the article table is empty. Public content routes,
+metadata, sitemap entries, news sitemap entries, and the RSS feed include only eligible published
+or due scheduled content.
+
+Image uploads use a storage abstraction. `MEDIA_STORAGE_PROVIDER="local"` writes to
+`public/uploads` for local development only; it intentionally refuses permanent production uploads.
+Add a Vercel Blob, Cloudinary, or S3-compatible adapter before enabling production media uploads.
+Set `SITE_URL` to the deployed canonical origin so metadata, feeds, and sitemaps use production URLs.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

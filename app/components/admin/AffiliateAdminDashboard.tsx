@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-html-link-for-pages -- Legacy admin navigation remains a plain authenticated link. */
+
 import { useMemo, useState, type ReactNode } from 'react';
 
 import {

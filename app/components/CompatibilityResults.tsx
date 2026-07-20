@@ -23,7 +23,7 @@ interface CompatibilityResultsProps {
   sectionId?: string;
   actions?: ReactNode;
   advancedDetails?: ReactNode;
-  signupSource: Exclude<EmailSignupSource, 'homepage'>;
+  signupSource: Exclude<EmailSignupSource, 'homepage' | 'article'>;
 }
 
 export function CompatibilityResults({

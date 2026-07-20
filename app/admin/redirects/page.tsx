@@ -1,0 +1,1 @@
+import { RedirectAdminDashboard } from '../../components/admin/RedirectAdminDashboard'; import { requireAdminPage } from '../../lib/admin-auth'; import { getRedirects } from '../../lib/cms-data'; export const dynamic = 'force-dynamic'; export default async function Page() { await requireAdminPage(); return <RedirectAdminDashboard initialItems={await getRedirects()} />; }

@@ -31,6 +31,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <SiteFooter />
+        <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'CanMyPCRunGTA6', url: process.env.SITE_URL || 'http://localhost:3000' }).replace(/</g, '\\u003c') }} type="application/ld+json" />
       </body>
     </html>
   );

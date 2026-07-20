@@ -6,7 +6,10 @@ import { type FormEvent, useId, useState } from 'react';
 import type { CoreRecommendationScenarioCode } from '../data/recommendation-scenarios';
 import type { EmailSignupSource } from '../lib/subscriber-types';
 
-type EmailSignupProps =
+type EmailSignupProps = {
+  heading?: string;
+  description?: string;
+} & (
   | {
       variant: 'homepage';
       signupSource: 'homepage';
@@ -14,9 +17,14 @@ type EmailSignupProps =
     }
   | {
       variant: 'result';
-      signupSource: Exclude<EmailSignupSource, 'homepage'>;
+      signupSource: Exclude<EmailSignupSource, 'homepage' | 'article'>;
       scenario: CoreRecommendationScenarioCode;
-    };
+    }
+  | {
+      variant: 'article';
+      signupSource: 'article';
+      scenario?: never;
+    });
 
 interface SignupResponse {
   error?: string;
@@ -32,6 +40,7 @@ export function EmailSignup(props: EmailSignupProps) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const isHomepage = props.variant === 'homepage';
+  const isArticle = props.variant === 'article';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -87,12 +96,14 @@ export function EmailSignup(props: EmailSignupProps) {
             Email updates
           </p>
           <h2 id={`${formId}-heading`} className="mt-1 text-xl font-black text-white">
-            {isHomepage ? 'GTA VI Launch Alerts' : 'Stay GTA VI Ready'}
+            {props.heading || (isHomepage ? 'GTA VI Launch Alerts' : isArticle ? 'Get GTA VI PC Updates' : 'Stay GTA VI Ready')}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            {isHomepage
+            {props.description || (isHomepage
               ? 'Get notified when official PC requirements, release details, and major updates are announced.'
-              : getResultsSignupDescription(props.scenario)}
+              : isArticle
+                ? 'Get requirement updates and occasional gaming hardware offers.'
+                : getResultsSignupDescription(props.scenario))}
           </p>
         </div>
 

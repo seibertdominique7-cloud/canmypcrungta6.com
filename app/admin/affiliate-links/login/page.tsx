@@ -7,7 +7,7 @@ import {
 } from '../../../lib/admin-auth';
 
 export const metadata: Metadata = {
-  title: 'Affiliate Admin Login',
+  title: 'Private Admin Login',
   robots: { index: false, follow: false },
 };
 
@@ -17,7 +17,7 @@ export default async function AffiliateAdminLoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   if (await isAdminAuthenticated()) {
-    redirect('/admin/products');
+    redirect('/admin');
   }
 
   const { error } = await searchParams;
@@ -34,7 +34,7 @@ export default async function AffiliateAdminLoginPage({
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
           Private admin
         </p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight">Affiliate links</h1>
+        <h1 className="mt-3 text-3xl font-black tracking-tight">Site administration</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-400">
           Sign in with the owner password configured on the server.
         </p>
@@ -46,7 +46,7 @@ export default async function AffiliateAdminLoginPage({
         ) : null}
 
         <form action="/api/admin/login" method="post" className="mt-6 grid gap-4">
-          <input type="hidden" name="next" value="/admin/products" />
+          <input type="hidden" name="next" value="/admin" />
           <label className="grid gap-2 text-sm font-bold text-slate-200">
             Admin password
             <input

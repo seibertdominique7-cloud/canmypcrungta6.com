@@ -4,6 +4,7 @@ export const EMAIL_SIGNUP_SOURCES = [
   'homepage',
   'screenshot-result',
   'manual-result',
+  'article',
 ] as const;
 
 export const EMAIL_SUBSCRIBER_STATUSES = [

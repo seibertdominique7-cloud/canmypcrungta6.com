@@ -72,7 +72,7 @@ const SCREENSHOT_UPLOAD_COPY = {
     'We could not read text from this screenshot. Please try a clearer image or check your connection.',
 } as const;
 
-export function ScreenshotAnalyzer() {
+export function ScreenshotAnalyzer({ uploadButtonText, manualEntryButtonText, scannerText }: { uploadButtonText?: string; manualEntryButtonText?: string; scannerText?: string } = {}) {
   const {
     inputRef,
     selectedFile,
@@ -134,7 +134,7 @@ export function ScreenshotAnalyzer() {
           disabled={isAnalyzing}
           onClick={openFilePicker}
         >
-          {SCREENSHOT_UPLOAD_COPY.uploadButton}
+          {'📸'} {uploadButtonText || 'Upload Screenshot'}
         </button>
 
         <button
@@ -144,7 +144,7 @@ export function ScreenshotAnalyzer() {
           disabled={isAnalyzing}
           onClick={startManualEntry}
         >
-          {SCREENSHOT_UPLOAD_COPY.manualEntryButton}
+          {'⚙️'} {manualEntryButtonText || 'Enter Specs Manually'}
         </button>
 
         <a
@@ -152,7 +152,7 @@ export function ScreenshotAnalyzer() {
           className="theme-secondary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
           aria-label={SCREENSHOT_UPLOAD_COPY.scannerLabel}
         >
-          {SCREENSHOT_UPLOAD_COPY.scannerButton}
+          {'⬇️'} {scannerText || 'Automatic PC scanner coming soon.'}
         </a>
         </div>
 

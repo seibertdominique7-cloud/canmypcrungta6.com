@@ -1,0 +1,1 @@
+import { MediaAdminDashboard } from '../../components/admin/MediaAdminDashboard'; import { requireAdminPage } from '../../lib/admin-auth'; import { getMediaAssets } from '../../lib/cms-data'; export const dynamic = 'force-dynamic'; export default async function Page() { await requireAdminPage(); return <MediaAdminDashboard initialItems={await getMediaAssets()} />; }

@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-html-link-for-pages -- The catalog link intentionally performs a full authenticated navigation. */
+
 import { useMemo, useState, type ReactNode } from 'react';
 
 import {
@@ -10,7 +12,7 @@ import {
 } from '../../lib/affiliate-types';
 import type { AssignmentInput, AssignmentUpdateInput } from '../../lib/catalog-validation';
 import { RecommendationProductCard } from '../RecommendationProductCard';
-import { AdminHeader } from './ProductCatalogDashboard';
+import { AdminHeader } from './AdminHeader';
 
 interface WorkspaceResponse {
   error?: string;

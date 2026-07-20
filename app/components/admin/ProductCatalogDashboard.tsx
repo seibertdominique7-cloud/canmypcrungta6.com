@@ -10,6 +10,7 @@ import {
 } from '../../lib/affiliate-types';
 import type { ProductInput } from '../../lib/catalog-validation';
 import { RecommendationProductCard } from '../RecommendationProductCard';
+import { AdminHeader } from './AdminHeader';
 
 interface ProductResponse {
   error?: string;
@@ -182,10 +183,6 @@ function ProductForm({ product, busy, fieldErrors, onSave }: { product: ProductR
   );
 }
 
-function AdminHeader({ active }: { active: 'products' | 'recommendations' }) {
-  return <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-5"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-violet-300">Private admin</p><p className="mt-1 font-black">Recommendation Manager</p></div><nav className="flex flex-wrap gap-2"><a className={active === 'products' ? primaryButton : secondaryButton} href="/admin/products">Product Catalog</a><a className={active === 'recommendations' ? primaryButton : secondaryButton} href="/admin/recommendations">Recommendations</a><a className={secondaryButton} href="/admin/subscribers">Subscribers</a><form action="/api/admin/logout" method="post"><button className={secondaryButton} type="submit">Log out</button></form></nav></header>;
-}
-
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"><div className="mx-auto my-6 max-w-2xl rounded-3xl border border-white/15 bg-[#0d111d] p-5 shadow-2xl sm:p-6"><div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black">{title}</h2><button className={secondaryButton} onClick={onClose} type="button">Close</button></div>{children}</div></div>; }
 function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}{error ? <span className="text-xs text-red-300">{error}</span> : null}</label>; }
 function StatusMessage({ children, error }: { children: ReactNode; error?: string }) { return <p aria-live="polite" className={`mt-4 rounded-xl border px-3 py-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>{children}</p>; }
@@ -199,5 +196,3 @@ const secondaryButton = 'rounded-xl border border-white/15 bg-white/5 px-4 py-2 
 const dangerButton = 'rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-200 hover:bg-red-500/20 disabled:opacity-50';
 const enabledBadge = 'rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300';
 const disabledBadge = 'rounded-full bg-slate-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-400';
-
-export { AdminHeader };

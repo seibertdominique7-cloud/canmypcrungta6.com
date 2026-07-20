@@ -14,6 +14,36 @@ const adapter = new PrismaBetterSqlite3({
 });
 const prisma = new PrismaClient({ adapter });
 
+const defaultContentCategories = [
+  'GTA VI News',
+  'System Requirements',
+  'GPU Guides',
+  'CPU Guides',
+  'Gaming Laptops',
+  'Prebuilt Gaming PCs',
+  'Upgrade Guides',
+  'Comparisons',
+  'Deals',
+  'Tutorials',
+] as const;
+
+const defaultSiteContent = [
+  ['homepage_title', 'Homepage title', 'Can My PC Run GTA VI?', 'text', 'Homepage'],
+  ['homepage_description', 'Homepage description', 'Check if your gaming rig meets the current requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.', 'textarea', 'Homepage'],
+  ['upload_button_text', 'Upload button text', 'Upload Screenshot', 'text', 'Checker'],
+  ['manual_entry_button_text', 'Manual entry button text', 'Enter Specs Manually', 'text', 'Checker'],
+  ['scanner_coming_soon_text', 'Scanner coming-soon text', 'Automatic PC scanning is coming soon.', 'text', 'Checker'],
+  ['affiliate_disclosure', 'Affiliate disclosure', 'Disclosure: We may earn a commission when you purchase through links on this page, at no additional cost to you.', 'textarea', 'Monetization'],
+  ['email_signup_heading', 'Email signup heading', 'Get GTA VI PC updates', 'text', 'Email'],
+  ['email_signup_description', 'Email signup description', 'Get requirement updates and occasional gaming hardware offers.', 'textarea', 'Email'],
+  ['footer_text', 'Footer text', 'CanMyPCRunGTA6 helps PC players understand estimated GTA VI hardware requirements.', 'textarea', 'Footer'],
+  ['estimated_requirements_disclaimer', 'Estimated requirements disclaimer', 'Rockstar Games has not published official GTA VI PC requirements. These values are estimates and may change.', 'textarea', 'Checker'],
+  ['navigation_articles_label', 'Articles navigation label', 'Articles', 'text', 'Navigation'],
+  ['navigation_checker_label', 'Checker navigation label', 'PC Checker', 'text', 'Navigation'],
+  ['contact_email', 'Contact email', '', 'email', 'Contact'],
+  ['social_links', 'Social links', '{}', 'json', 'Contact'],
+] as const;
+
 interface SeedAffiliateLink {
   id: string;
   scenarioCode: string;
@@ -349,10 +379,69 @@ async function main() {
   await migrateLegacyPrebuiltProducts();
   await migrateLegacyPurchaseLinks();
   await syncCatalogFromLegacy();
+  await seedContentManagement();
 
   console.log(
     `Seeded ${CORE_RECOMMENDATION_SCENARIOS.length} result scenarios, ${defaultSectionCount} editable sections, ${PREBUILT_RECOMMENDATION_GROUPS.length} preserved legacy prebuilt groups, and ${seedLinks.length} example affiliate products.`,
   );
+}
+
+async function seedContentManagement() {
+  for (const [index, name] of defaultContentCategories.entries()) {
+    const slug = slugify(name);
+    await prisma.contentCategory.upsert({
+      where: { slug },
+      update: {},
+      create: { name, slug, displayOrder: (index + 1) * 10 },
+    });
+  }
+
+  for (const [key, label, value, contentType, group] of defaultSiteContent) {
+    await prisma.siteContent.upsert({
+      where: { key },
+      update: {},
+      create: { key, label, value, contentType, group },
+    });
+  }
+
+  if (await prisma.article.count()) return;
+
+  const samples = [
+    ['GTA VI Estimated PC Requirements', 'system-requirements', 'A practical overview of the estimated PC hardware needed for GTA VI.', '# GTA VI Estimated PC Requirements\n\nThese requirements are estimates until Rockstar publishes official PC specifications.\n\n:::checker\nCheck your PC now\n:::', 'standard'],
+    ['Best GPUs for GTA VI', 'gpu-guides', 'A starting point for choosing a graphics card for GTA VI.', '# Best GPUs for GTA VI\n\nCompare current GPUs against our estimated minimum and recommended tiers.\n\n:::callout\nAlways confirm power-supply and case compatibility before upgrading.\n:::', 'hardware-guide'],
+    ['How to Find Your PC Specs', 'tutorials', 'Find your CPU, GPU, RAM, Windows version, and storage details.', '# How to Find Your PC Specs\n\n1. Press **Windows + R**.\n2. Type `msinfo32`.\n3. Press Enter.\n\n:::checker\nUpload your screenshot\n:::', 'tutorial'],
+    ['Best Budget Gaming PCs for GTA VI', 'prebuilt-gaming-pcs', 'What to look for in an affordable GTA VI-ready gaming desktop.', '# Best Budget Gaming PCs for GTA VI\n\nStart with the GPU, then verify the CPU, memory, and storage.\n\n:::email-signup\n:::', 'deals'],
+  ] as const;
+
+  for (const [index, [title, categorySlug, excerpt, body, contentType]] of samples.entries()) {
+    const category = await prisma.contentCategory.findUnique({ where: { slug: categorySlug } });
+    await prisma.article.create({
+      data: {
+        title,
+        slug: slugify(title),
+        excerpt,
+        body,
+        status: 'draft',
+        contentType,
+        seoTitle: title,
+        metaDescription: excerpt,
+        categories: category
+          ? { create: { categoryId: category.id, isPrimary: true } }
+          : undefined,
+        createdAt: new Date(Date.now() + index),
+      },
+    });
+  }
+}
+
+function slugify(value: string) {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
 }
 
 async function migrateLegacyPrebuiltProducts() {

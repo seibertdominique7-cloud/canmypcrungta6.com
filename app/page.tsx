@@ -5,8 +5,11 @@ import {
   getRequirementDisclaimer,
   getRequirementLabel,
 } from './data/gta6-requirements';
+import { getSiteContentMap } from './lib/cms-data';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+export default async function Home() {
+  const content = await getSiteContentMap();
   return (
     <div className="public-theme min-h-screen">
       {/* Main content */}
@@ -15,26 +18,21 @@ export default function Home() {
         <header className="flex flex-col items-center justify-center w-full max-w-4xl mb-12 sm:mb-16 lg:mb-20 text-center">
           {/* Main headline */}
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 tracking-tight leading-tight">
-            Can My PC Run
-            <br />
-            <span className="theme-accent-text">
-              GTA VI?
-            </span>
+            <span className="theme-accent-text">{content.homepage_title || 'Can My PC Run GTA VI?'}</span>
           </h1>
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mb-6 leading-relaxed">
-            Check if your gaming rig meets the current requirements for Grand Theft Auto VI. Get
-            instant compatibility results and personalized upgrade recommendations.
+            {content.homepage_description || 'Check if your gaming rig meets the current requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.'}
           </p>
 
           {/* Disclaimer */}
           <p className="max-w-2xl rounded-full border border-white/10 bg-slate-950/35 px-4 py-2 text-sm italic text-slate-300 backdrop-blur-sm">
-            {'\u26A0\uFE0F'} {getRequirementLabel()}: {getRequirementDisclaimer()}
+            {'\u26A0\uFE0F'} {getRequirementLabel()}: {content.estimated_requirements_disclaimer || getRequirementDisclaimer()}
           </p>
         </header>
 
-        <ScreenshotAnalyzer />
+        <ScreenshotAnalyzer uploadButtonText={content.upload_button_text} manualEntryButtonText={content.manual_entry_button_text} scannerText={content.scanner_coming_soon_text} />
 
         {/* Feature cards section */}
         <section className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4 sm:px-0">
@@ -61,7 +59,7 @@ export default function Home() {
         </section>
 
         <div className="mb-16 mt-10 flex w-full justify-center px-4 sm:mt-12 sm:px-0">
-          <EmailSignup signupSource="homepage" variant="homepage" />
+          <EmailSignup description={content.email_signup_description} heading={content.email_signup_heading} signupSource="homepage" variant="homepage" />
         </div>
       </main>
 

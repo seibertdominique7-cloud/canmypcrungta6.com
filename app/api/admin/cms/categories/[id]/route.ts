@@ -1,0 +1,7 @@
+import { requireAdminApi } from '../../../../../lib/admin-auth';
+import { adminRouteError, readJson } from '../../../../../lib/admin-api';
+import { deleteCategory, getCategories, mergeCategory, moveCategory, saveCategory } from '../../../../../lib/cms-data';
+import { categoryInput } from '../route';
+
+export async function PATCH(request: Request, context: RouteContext<'/api/admin/cms/categories/[id]'>) { const denied = await requireAdminApi(request); if (denied) return denied; const { id } = await context.params; const body = await readJson(request); const item = typeof body === 'object' && body !== null ? body as Record<string, unknown> : {}; try { if (item.action === 'merge' && typeof item.targetId === 'string') await mergeCategory(id, item.targetId); else if (item.action === 'move' && (item.direction === 'up' || item.direction === 'down')) await moveCategory(id, item.direction); else await saveCategory(categoryInput(body), id); return Response.json({ message: item.action === 'merge' ? 'Categories merged.' : 'Category saved.', items: await getCategories() }); } catch (error) { return adminRouteError(error); } }
+export async function DELETE(request: Request, context: RouteContext<'/api/admin/cms/categories/[id]'>) { const denied = await requireAdminApi(request); if (denied) return denied; try { await deleteCategory((await context.params).id); return Response.json({ message: 'Category deleted.', items: await getCategories() }); } catch (error) { return adminRouteError(error); } }

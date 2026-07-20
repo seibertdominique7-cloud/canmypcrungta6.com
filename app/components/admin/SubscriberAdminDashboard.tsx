@@ -10,6 +10,7 @@ import {
   type SubscriberAdminFilters,
   type SubscriberAdminPayload,
 } from '../../lib/subscriber-types';
+import { AdminHeader } from './AdminHeader';
 
 const initialFilters: SubscriberAdminFilters = {
   search: '',
@@ -121,25 +122,8 @@ export function SubscriberAdminDashboard({
   return (
     <main className="admin-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-300">
-              Private admin
-            </p>
-            <h1 className="mt-2 text-3xl font-black">Email Subscribers</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Review consent, compatibility segments, signup sources, and subscriber status.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <a className={secondaryButton} href="/admin/recommendations">
-              Recommendations
-            </a>
-            <form action="/api/admin/logout" method="post">
-              <button className={secondaryButton} type="submit">Log out</button>
-            </form>
-          </div>
-        </header>
+        <AdminHeader active="subscribers" />
+        <header className="mb-6"><h1 className="text-3xl font-black">Email Subscribers</h1><p className="mt-2 text-sm text-slate-400">Review consent, compatibility segments, signup sources, and subscriber status.</p></header>
 
         <section aria-label="Subscriber summary" className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <AdminMetric label="Active" value={summary.totalActive} />

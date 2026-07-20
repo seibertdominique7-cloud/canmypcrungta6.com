@@ -185,6 +185,7 @@ async function getSubscriberAdminSummary(): Promise<SubscriberAdminSummary> {
     homepage: 0,
     'screenshot-result': 0,
     'manual-result': 0,
+    article: 0,
   };
   const scenarioCounts: Partial<Record<CoreRecommendationScenarioCode, number>> = {};
 

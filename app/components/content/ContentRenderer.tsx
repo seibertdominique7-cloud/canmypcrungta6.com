@@ -1,0 +1,137 @@
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element -- Sanitized CMS links and media are runtime-authored. */
+import type { ReactNode } from 'react';
+
+import { prisma } from '../../lib/prisma';
+import { getSiteContentMap } from '../../lib/cms-data';
+import { EmailSignup } from '../EmailSignup';
+import { RecommendationProductCard } from '../RecommendationProductCard';
+import type { AffiliateProductRecord } from '../../lib/affiliate-types';
+
+type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
+type Block =
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'paragraph' | 'quote'; text: string }
+  | { kind: 'code'; text: string }
+  | { kind: 'list'; ordered: boolean; items: string[] }
+  | { kind: 'table'; rows: string[][] }
+  | { kind: 'rule' }
+  | CustomBlock;
+
+export async function ContentRenderer({ body }: { body: string }) {
+  const blocks = parseContent(body);
+  const productIds = blocks.filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'affiliate').map((block) => block.argument).filter(Boolean);
+  const [products, siteContent] = await Promise.all([
+    productIds.length ? prisma.product.findMany({ where: { id: { in: productIds }, enabled: true } }) : [],
+    getSiteContentMap(),
+  ]);
+  const productMap = new Map(products.map((product) => [product.id, product]));
+  const hasAffiliate = blocks.some((block) => isCustomBlock(block) && block.kind === 'affiliate' && productMap.has(block.argument));
+
+  return (
+    <div className="content-renderer grid gap-5 text-base leading-8 text-slate-200">
+      {blocks.map((block, index) => renderBlock(block, index, productMap, siteContent))}
+      {hasAffiliate ? <p className="mt-2 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">{siteContent.affiliate_disclosure || 'Disclosure: We may earn a commission when you purchase through links on this page, at no additional cost to you.'}</p> : null}
+    </div>
+  );
+}
+
+export function extractFaqItems(body: string) {
+  return parseContent(body).filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'faq').map((block) => faqParts(block.text)).filter((item) => item.question && item.answer);
+}
+
+export function estimateReadingTime(body: string) {
+  const words = body.replace(/:::[\s\S]*?:::/g, ' ').match(/[\p{L}\p{N}']+/gu)?.length ?? 0;
+  return Math.max(1, Math.ceil(words / 220));
+}
+
+function parseContent(body: string): Block[] {
+  const lines = body.replace(/\r\n?/g, '\n').split('\n');
+  const blocks: Block[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) { index += 1; continue; }
+    if (line.startsWith('```')) {
+      const content: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith('```')) content.push(lines[index++]);
+      blocks.push({ kind: 'code', text: content.join('\n') }); index += 1; continue;
+    }
+    if (line.startsWith(':::')) {
+      const [kindValue, ...argumentParts] = line.slice(3).trim().split(/\s+/);
+      const kind = kindValue as Block['kind'];
+      const content: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== ':::') content.push(lines[index++]);
+      if (['callout', 'faq', 'affiliate', 'email-signup', 'ad', 'checker'].includes(kind)) blocks.push({ kind: kind as 'callout', argument: argumentParts.join(' '), text: content.join('\n').trim() });
+      index += 1; continue;
+    }
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+    if (heading) { blocks.push({ kind: 'heading', level: heading[1].length, text: heading[2] }); index += 1; continue; }
+    if (/^\s*(---|\*\*\*)\s*$/.test(line)) { blocks.push({ kind: 'rule' }); index += 1; continue; }
+    if (line.startsWith('> ')) { blocks.push({ kind: 'quote', text: line.slice(2) }); index += 1; continue; }
+    if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
+      const ordered = /^\s*\d+\./.test(line); const items: string[] = [];
+      while (index < lines.length && (ordered ? /^\s*\d+\.\s+/.test(lines[index]) : /^\s*[-*]\s+/.test(lines[index]))) items.push(lines[index++].replace(ordered ? /^\s*\d+\.\s+/ : /^\s*[-*]\s+/, ''));
+      blocks.push({ kind: 'list', ordered, items }); continue;
+    }
+    if (line.includes('|') && index + 1 < lines.length && /^\s*\|?\s*:?-+/.test(lines[index + 1])) {
+      const rows = [splitTableRow(line)]; index += 2;
+      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) rows.push(splitTableRow(lines[index++]));
+      blocks.push({ kind: 'table', rows }); continue;
+    }
+    const paragraph = [line]; index += 1;
+    while (index < lines.length && lines[index].trim() && !isSpecialLine(lines[index])) paragraph.push(lines[index++]);
+    blocks.push({ kind: 'paragraph', text: paragraph.join(' ') });
+  }
+  return moveEarlyMonetization(blocks);
+}
+
+function moveEarlyMonetization(blocks: Block[]) {
+  const isMonetized = (block: Block) => ['affiliate', 'email-signup', 'ad'].includes(block.kind);
+  const early = blocks.slice(0, 2).filter(isMonetized);
+  if (!early.length) return blocks;
+  return [...blocks.slice(0, 2).filter((block) => !isMonetized(block)), ...blocks.slice(2), ...early];
+}
+
+function renderBlock(block: Block, index: number, products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>, siteContent: Record<string, string>) : ReactNode {
+  const key = `${block.kind}-${index}`;
+  if (block.kind === 'heading') {
+    const Tag = `h${Math.min(6, Math.max(2, block.level + 1))}` as 'h2';
+    return <Tag className="mt-5 text-balance text-2xl font-black text-white" key={key}>{inline(block.text)}</Tag>;
+  }
+  if (block.kind === 'paragraph') return <p key={key}>{inline(block.text)}</p>;
+  if (block.kind === 'quote') return <blockquote className="border-l-4 border-violet-400 bg-violet-500/10 px-5 py-3 italic text-slate-200" key={key}>{inline(block.text)}</blockquote>;
+  if (block.kind === 'code') return <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-black/50 p-4 text-sm text-emerald-200" key={key}><code>{block.text}</code></pre>;
+  if (block.kind === 'rule') return <hr className="border-white/10" key={key} />;
+  if (block.kind === 'list') { const Tag = block.ordered ? 'ol' : 'ul'; return <Tag className={`grid gap-2 pl-6 ${block.ordered ? 'list-decimal' : 'list-disc'}`} key={key}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</Tag>; }
+  if (block.kind === 'table') return <div className="overflow-x-auto" key={key}><table className="w-full border-collapse text-left text-sm"><thead><tr>{block.rows[0]?.map((cell, cellIndex) => <th className="border border-white/10 bg-white/5 p-3" key={cellIndex}>{inline(cell)}</th>)}</tr></thead><tbody>{block.rows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td className="border border-white/10 p-3" key={cellIndex}>{inline(cell)}</td>)}</tr>)}</tbody></table></div>;
+  if (block.kind === 'callout') return <aside className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-5 text-cyan-50" key={key}>{inline(block.text)}</aside>;
+  if (block.kind === 'faq') { const item = faqParts(block.text); return <details className="rounded-2xl border border-white/10 bg-white/[0.03] p-4" key={key}><summary className="cursor-pointer font-black text-white">{item.question}</summary><p className="mt-3 text-slate-300">{inline(item.answer)}</p></details>; }
+  if (block.kind === 'email-signup') return <EmailSignup description={siteContent.email_signup_description} heading={siteContent.email_signup_heading} key={key} signupSource="article" variant="article" />;
+  if (block.kind === 'checker') return <a className="inline-flex justify-center rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400" href="/" key={key}>{block.text || 'Check whether your PC can run GTA VI'}</a>;
+  if (block.kind === 'ad') return <div aria-label="Advertisement" className="min-h-20 rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-slate-600" data-ad-slot={block.argument} key={key}>Advertisement</div>;
+  if (block.kind === 'affiliate') { const product = products.get(block.argument); return product ? <div className="max-w-xl" key={key}><RecommendationProductCard product={toAffiliateProduct(product)} /></div> : null; }
+  return null;
+}
+
+function inline(text: string): ReactNode[] {
+  const pattern = /(!?\[[^\]]*\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+  return text.split(pattern).filter(Boolean).map((part, index) => {
+    const image = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(part);
+    if (image && safeUrl(image[2], true)) return <img alt={image[1]} className="my-4 max-h-[560px] w-full rounded-2xl object-contain" key={index} loading="lazy" src={image[2]} />;
+    const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+    if (link && safeUrl(link[2], false)) return <a className="font-bold text-violet-300 underline underline-offset-4" href={link[2]} key={index} rel={link[2].startsWith('/') ? undefined : 'noopener noreferrer'}>{link[1]}</a>;
+    if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (/^\*[^*]+\*$/.test(part)) return <em key={index}>{part.slice(1, -1)}</em>;
+    if (/^`[^`]+`$/.test(part)) return <code className="rounded bg-black/40 px-1.5 py-0.5 text-emerald-200" key={index}>{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+function safeUrl(value: string, image: boolean) { if (value.startsWith('/') && !value.startsWith('//')) return true; try { const url = new URL(value); return url.protocol === 'https:' && (image || !url.username); } catch { return false; } }
+function splitTableRow(line: string) { return line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()); }
+function isSpecialLine(line: string) { return /^(#{1,6})\s+/.test(line) || line.startsWith('```') || line.startsWith(':::') || line.startsWith('> ') || /^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line) || /^\s*(---|\*\*\*)\s*$/.test(line); }
+function faqParts(text: string) { const lines = text.split('\n').map((line) => line.trim()).filter(Boolean); const question = (lines.find((line) => /^q:/i.test(line)) ?? lines[0] ?? '').replace(/^q:\s*/i, ''); const answer = (lines.find((line) => /^a:/i.test(line)) ?? lines.slice(1).join(' ')).replace(/^a:\s*/i, ''); return { question, answer }; }
+function isCustomBlock(block: Block): block is CustomBlock { return 'argument' in block; }
+function toAffiliateProduct(product: Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>): AffiliateProductRecord { return { id: product.id, productId: product.id, sectionId: '', title: product.title, retailer: product.retailer as AffiliateProductRecord['retailer'], affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, priceText: product.defaultPriceText, badge: 'Recommended', shortDescription: product.shortDescription, buttonText: 'View Product', componentType: product.componentType as AffiliateProductRecord['componentType'], platform: product.platform as AffiliateProductRecord['platform'], enabled: product.enabled, displayOrder: 0, createdAt: product.createdAt.toISOString(), updatedAt: product.updatedAt.toISOString() }; }
