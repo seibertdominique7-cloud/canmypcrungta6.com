@@ -8,6 +8,7 @@ import {
   DEFAULT_RECOMMENDATION_SECTIONS,
   getDefaultSectionId,
 } from '../app/data/recommendation-sections';
+import { DEFAULT_AD_PLACEMENTS } from '../app/data/ad-placements';
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL ?? 'file:./dev.db',
@@ -25,6 +26,20 @@ const defaultContentCategories = [
   'Comparisons',
   'Deals',
   'Tutorials',
+] as const;
+
+const defaultMediaFolders = [
+  'Articles',
+  'Products',
+  'GPUs',
+  'CPUs',
+  'RAM',
+  'Storage',
+  'Laptops',
+  'Desktops',
+  'Homepage',
+  'Logos',
+  'Miscellaneous',
 ] as const;
 
 const defaultSiteContent = [
@@ -380,13 +395,64 @@ async function main() {
   await migrateLegacyPurchaseLinks();
   await syncCatalogFromLegacy();
   await seedContentManagement();
+  await seedAdManagement();
 
   console.log(
     `Seeded ${CORE_RECOMMENDATION_SCENARIOS.length} result scenarios, ${defaultSectionCount} editable sections, ${PREBUILT_RECOMMENDATION_GROUPS.length} preserved legacy prebuilt groups, and ${seedLinks.length} example affiliate products.`,
   );
 }
 
+async function seedAdManagement() {
+  await prisma.adGlobalSettings.upsert({
+    where: { id: 'global' },
+    update: {},
+    create: {
+      id: 'global',
+      masterEnabled: false,
+      defaultProvider: 'disabled',
+      adsenseClient: '',
+      debugPlaceholders: false,
+      defaultLabel: 'Advertisement',
+      defaultResponsive: true,
+    },
+  });
+
+  for (const placement of DEFAULT_AD_PLACEMENTS) {
+    await prisma.adPlacement.upsert({
+      where: { code: placement.code },
+      update: {},
+      create: {
+        id: `ad-${placement.code}`,
+        code: placement.code,
+        displayName: placement.displayName,
+        description: placement.description,
+        enabled: false,
+        provider: 'disabled',
+        useGlobalClient: true,
+        adClientOverride: '',
+        adSlot: '',
+        format: placement.defaultFormat,
+        responsive: true,
+        deviceTarget: placement.defaultDeviceTarget,
+        label: '',
+        displayOrder: placement.displayOrder,
+        customHtml: '',
+        customHtmlTrusted: false,
+      },
+    });
+  }
+}
+
 async function seedContentManagement() {
+  for (const [index, name] of defaultMediaFolders.entries()) {
+    const slug = slugify(name);
+    await prisma.mediaFolder.upsert({
+      where: { slug },
+      update: {},
+      create: { name, slug, displayOrder: (index + 1) * 10 },
+    });
+  }
+
   for (const [index, name] of defaultContentCategories.entries()) {
     const slug = slugify(name);
     await prisma.contentCategory.upsert({

@@ -2,10 +2,165 @@
 import type { ArticleRecord } from '../../lib/cms-types';
 import { getRelatedArticles, getRecentArticles } from '../../lib/cms-data';
 import { getSiteUrl } from '../../lib/seo';
+import { ArticleBottomAd, SidebarAd } from '../ads/AdPlacements';
 import { ContentCard } from './ContentCard';
 import { ContentRenderer, estimateReadingTime, extractFaqItems } from './ContentRenderer';
 
-export async function PublicArticle({ article, preview = false }: { article: ArticleRecord; preview?: boolean }) { const [related, recent] = await Promise.all([getRelatedArticles(article), getRecentArticles(5)]); const primary = article.categories.find((item) => item.isPrimary) ?? article.categories[0]; const faq = extractFaqItems(article.body); const publishedDate = article.publishedAt ?? article.scheduledAt ?? article.createdAt; const articleSchema = { '@context': 'https://schema.org', '@type': article.schemaType || 'Article', headline: article.title, description: article.excerpt, image: article.featuredImage ? [absoluteUrl(article.featuredImage)] : undefined, datePublished: publishedDate, dateModified: article.updatedAt, author: { '@type': 'Organization', name: article.authorName }, mainEntityOfPage: `${getSiteUrl()}/articles/${article.slug}` }; const faqSchema = faq.length ? { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((item) => ({ '@type': 'Question', name: item.question, acceptedAnswer: { '@type': 'Answer', text: item.answer } })) } : null; return <main className="public-theme min-h-screen px-4 py-10 text-slate-100 sm:px-6"><article className="mx-auto max-w-4xl">{preview ? <p className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm font-bold text-amber-200">Private draft preview · This URL requires an admin session.</p> : null}<nav aria-label="Breadcrumb" className="text-sm text-slate-500"><a href="/">PC Checker</a><span className="mx-2">/</span><a href="/articles">Articles</a>{primary ? <><span className="mx-2">/</span><a href={`/category/${primary.slug}`}>{primary.name}</a></> : null}</nav><header className="mt-6"><p className="text-xs font-black uppercase tracking-[0.18em] text-violet-300">{article.contentType.replace(/-/g, ' ')}</p><h1 className="mt-3 text-balance text-4xl font-black leading-tight sm:text-6xl">{article.title}</h1><p className="mt-5 text-xl leading-8 text-slate-300">{article.excerpt}</p><div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500"><span>By {article.authorName}</span><time dateTime={publishedDate}>Published {formatDate(publishedDate)}</time><time dateTime={article.updatedAt}>Updated {formatDate(article.updatedAt)}</time><span>{estimateReadingTime(article.body)} min read</span></div>{article.tags.length ? <div className="mt-4 flex flex-wrap gap-2">{article.tags.map((tag) => <a className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300" href={`/tag/${tag.slug}`} key={tag.id}>{tag.name}</a>)}</div> : null}</header>{article.featuredImage ? <img alt="" className="mt-8 max-h-[600px] w-full rounded-3xl bg-black/20 object-cover" src={article.featuredImage} /> : null}<div className="mt-10"><ContentRenderer body={article.body} /></div><a className="mt-10 inline-flex rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400" href="/">Check whether your PC can run GTA VI</a></article>{related.length ? <section className="mx-auto mt-16 max-w-6xl"><h2 className="text-3xl font-black">Related Articles</h2><div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-4">{related.map((item) => <ContentCard article={item} key={item.id} />)}</div></section> : null}<aside className="mx-auto mt-12 max-w-4xl rounded-3xl border border-white/10 bg-white/[0.04] p-5"><h2 className="text-xl font-black">Recent Articles</h2><ul className="mt-3 grid gap-2">{recent.filter((item) => item.id !== article.id).slice(0, 5).map((item) => <li key={item.id}><a className="text-violet-300 hover:underline" href={`/articles/${item.slug}`}>{item.title}</a></li>)}</ul></aside><script dangerouslySetInnerHTML={{ __html: safeJson(articleSchema) }} type="application/ld+json" />{faqSchema ? <script dangerouslySetInnerHTML={{ __html: safeJson(faqSchema) }} type="application/ld+json" /> : null}</main>; }
-function formatDate(value: string) { return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(value)); }
-function absoluteUrl(value: string) { return value.startsWith('/') ? `${getSiteUrl()}${value}` : value; }
-function safeJson(value: object) { return JSON.stringify(value).replace(/</g, '\\u003c'); }
+export async function PublicArticle({
+  article,
+  preview = false,
+}: {
+  article: ArticleRecord;
+  preview?: boolean;
+}) {
+  const [related, recent] = await Promise.all([
+    getRelatedArticles(article),
+    getRecentArticles(5),
+  ]);
+  const primary = article.categories.find((item) => item.isPrimary) ?? article.categories[0];
+  const faq = extractFaqItems(article.body);
+  const publishedDate = article.publishedAt ?? article.scheduledAt ?? article.createdAt;
+  const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': article.schemaType || 'Article',
+    headline: article.title,
+    description: article.excerpt,
+    image: article.featuredImage ? [absoluteUrl(article.featuredImage)] : undefined,
+    datePublished: publishedDate,
+    dateModified: article.updatedAt,
+    author: { '@type': 'Organization', name: article.authorName },
+    mainEntityOfPage: `${getSiteUrl()}/articles/${article.slug}`,
+  };
+  const faqSchema = faq.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faq.map((item) => ({
+          '@type': 'Question',
+          name: item.question,
+          acceptedAnswer: { '@type': 'Answer', text: item.answer },
+        })),
+      }
+    : null;
+
+  return (
+    <main className="public-theme min-h-screen px-4 py-10 text-slate-100 sm:px-6">
+      <article className="mx-auto max-w-4xl">
+        {preview ? (
+          <p className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm font-bold text-amber-200">
+            Private draft preview · This URL requires an admin session.
+          </p>
+        ) : null}
+        <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
+          <a href="/">PC Checker</a>
+          <span className="mx-2">/</span>
+          <a href="/articles">Articles</a>
+          {primary ? (
+            <>
+              <span className="mx-2">/</span>
+              <a href={`/category/${primary.slug}`}>{primary.name}</a>
+            </>
+          ) : null}
+        </nav>
+        <header className="mt-6">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-300">
+            {article.contentType.replace(/-/g, ' ')}
+          </p>
+          <h1 className="mt-3 text-balance text-4xl font-black leading-tight sm:text-6xl">
+            {article.title}
+          </h1>
+          <p className="mt-5 text-xl leading-8 text-slate-300">{article.excerpt}</p>
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
+            <span>By {article.authorName}</span>
+            <time dateTime={publishedDate}>Published {formatDate(publishedDate)}</time>
+            <time dateTime={article.updatedAt}>Updated {formatDate(article.updatedAt)}</time>
+            <span>{estimateReadingTime(article.body)} min read</span>
+          </div>
+          {article.tags.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {article.tags.map((tag) => (
+                <a
+                  className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300"
+                  href={`/tag/${tag.slug}`}
+                  key={tag.id}
+                >
+                  {tag.name}
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </header>
+        {article.featuredImage ? (
+          <img
+            alt=""
+            className="mt-8 max-h-[600px] w-full rounded-3xl bg-black/20 object-contain"
+            referrerPolicy="no-referrer"
+            src={article.featuredImage}
+          />
+        ) : null}
+        <div className="mt-10">
+          <ContentRenderer articleAds body={article.body} />
+        </div>
+        <a
+          className="mt-10 inline-flex rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400"
+          href="/"
+        >
+          Check whether your PC can run GTA VI
+        </a>
+      </article>
+
+      <ArticleBottomAd className="mx-auto mt-12 w-full max-w-4xl" />
+
+      {related.length ? (
+        <section className="mx-auto mt-16 max-w-6xl">
+          <h2 className="text-3xl font-black">Related Articles</h2>
+          <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {related.map((item) => (
+              <ContentCard article={item} key={item.id} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <aside className="mx-auto mt-12 max-w-4xl rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <h2 className="text-xl font-black">Recent Articles</h2>
+        <ul className="mt-3 grid gap-2">
+          {recent
+            .filter((item) => item.id !== article.id)
+            .slice(0, 5)
+            .map((item) => (
+              <li key={item.id}>
+                <a className="text-violet-300 hover:underline" href={`/articles/${item.slug}`}>
+                  {item.title}
+                </a>
+              </li>
+            ))}
+        </ul>
+      </aside>
+      <SidebarAd className="mx-auto mt-6 w-full max-w-4xl" />
+
+      <script
+        dangerouslySetInnerHTML={{ __html: safeJson(articleSchema) }}
+        type="application/ld+json"
+      />
+      {faqSchema ? (
+        <script
+          dangerouslySetInnerHTML={{ __html: safeJson(faqSchema) }}
+          type="application/ld+json"
+        />
+      ) : null}
+    </main>
+  );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'long' }).format(new Date(value));
+}
+
+function absoluteUrl(value: string) {
+  return value.startsWith('/') ? `${getSiteUrl()}${value}` : value;
+}
+
+function safeJson(value: object) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}

@@ -153,6 +153,40 @@ model GamePurchaseLink {
   @@index([enabled, displayOrder])
 }
 
+model AdGlobalSettings {
+  id                    String   @id
+  masterEnabled         Boolean  @default(false)
+  defaultProvider       String   @default("disabled")
+  adsenseClient         String   @default("")
+  debugPlaceholders     Boolean  @default(false)
+  defaultLabel          String   @default("Advertisement")
+  defaultResponsive     Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+}
+
+model AdPlacement {
+  id                String   @id
+  code              String   @unique
+  displayName       String
+  description       String
+  enabled           Boolean  @default(false)
+  provider          String   @default("disabled")
+  useGlobalClient   Boolean  @default(true)
+  adClientOverride  String   @default("")
+  adSlot            String   @default("")
+  format            String   @default("auto")
+  responsive        Boolean  @default(true)
+  deviceTarget      String   @default("both")
+  label             String   @default("")
+  displayOrder      Int
+  customHtml        String   @default("")
+  customHtmlTrusted Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
+
+  @@index([enabled, displayOrder])
+  @@index([provider, enabled])
+}
+
 model EmailSubscriber {
   id                String    @id @default(cuid())
   email             String
@@ -320,20 +354,39 @@ model ContentRevision {
 }
 
 model MediaAsset {
-  id        String   @id @default(cuid())
-  filename  String
-  url       String   @unique
-  mimeType  String
-  width     Int?
-  height    Int?
-  fileSize  Int
-  altText   String   @default("")
-  title     String   @default("")
-  storageKey String  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String       @id @default(cuid())
+  filename         String
+  originalFilename String       @default("")
+  url              String       @unique
+  sourceType       String       @default("upload")
+  storageProvider  String       @default("local")
+  mimeType         String
+  width            Int?
+  height           Int?
+  fileSize         Int
+  altText          String       @default("")
+  title            String       @default("")
+  storageKey       String       @unique
+  folderId         String?
+  folder           MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([filename, createdAt])
+  @@index([sourceType, createdAt])
+  @@index([folderId, createdAt])
+}
+
+model MediaFolder {
+  id           String       @id @default(cuid())
+  name         String
+  slug         String       @unique
+  displayOrder Int          @default(0)
+  media        MediaAsset[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([displayOrder, name])
 }
 
 model SiteContent {

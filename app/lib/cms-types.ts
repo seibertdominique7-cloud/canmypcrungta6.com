@@ -101,7 +101,10 @@ export interface PageRecord extends SeoFields {
 export interface MediaAssetRecord {
   id: string;
   filename: string;
+  originalFilename: string;
   url: string;
+  sourceType: 'upload' | 'external';
+  storageProvider: 'local' | 'vercel-blob' | 'cloudinary' | 's3' | 'external';
   mimeType: string;
   width: number | null;
   height: number | null;
@@ -109,9 +112,38 @@ export interface MediaAssetRecord {
   altText: string;
   title: string;
   storageKey: string;
+  folderId: string | null;
+  folder: MediaFolderRecord | null;
   usageCount: number;
+  usages: MediaUsageRecord[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MediaFolderRecord {
+  id: string;
+  name: string;
+  slug: string;
+  displayOrder: number;
+  mediaCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MediaUsageRecord {
+  id: string;
+  kind: 'article' | 'page' | 'affiliate-product' | 'category' | 'site-content';
+  location: string;
+  label: string;
+  adminUrl: string;
+}
+
+export interface MediaStorageStatus {
+  provider: 'local' | 'vercel-blob' | 'cloudinary' | 's3';
+  configured: boolean;
+  persistent: boolean;
+  message: string;
+  maxUploadMb: number;
 }
 
 export interface SiteContentRecord {
@@ -139,5 +171,6 @@ export interface ContentWorkspace {
   categories: ContentCategoryRecord[];
   tags: ContentTagRecord[];
   media: MediaAssetRecord[];
+  mediaFolders: MediaFolderRecord[];
   affiliateProducts: Array<{ id: string; title: string; enabled: boolean }>;
 }

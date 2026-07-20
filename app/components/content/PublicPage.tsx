@@ -32,7 +32,7 @@ export function PublicPage({ page, preview = false }: { page: PageRecord; previe
           <h1 className="text-balance text-4xl font-black sm:text-6xl">{page.title}</h1>
           {page.excerpt ? <p className="mt-5 text-xl leading-8 text-slate-300">{page.excerpt}</p> : null}
         </header>
-        {page.featuredImage ? <img alt="" className="mt-8 w-full rounded-3xl object-cover" src={page.featuredImage} /> : null}
+        {page.featuredImage ? <img alt="" className="mt-8 max-h-[600px] w-full rounded-3xl object-contain" referrerPolicy="no-referrer" src={page.featuredImage} /> : null}
         <div className="mt-10"><ContentRenderer body={page.body} /></div>
       </article>
       <script dangerouslySetInnerHTML={{ __html: safeJson(pageSchema) }} type="application/ld+json" />

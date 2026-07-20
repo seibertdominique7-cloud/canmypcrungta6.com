@@ -1,13 +1,15 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element -- Sanitized CMS links and media are runtime-authored. */
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 import { prisma } from '../../lib/prisma';
 import { getSiteContentMap } from '../../lib/cms-data';
 import { EmailSignup } from '../EmailSignup';
 import { RecommendationProductCard } from '../RecommendationProductCard';
+import { ArticleMiddleAd, ArticleTopAd } from '../ads/AdPlacements';
 import type { AffiliateProductRecord } from '../../lib/affiliate-types';
 
 type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
+type ImageBlock = { kind: 'image'; url: string; alt: string; caption: string; align: 'left' | 'center' | 'right' | 'full'; size: 'small' | 'medium' | 'large' | 'full'; link: string };
 type Block =
   | { kind: 'heading'; level: number; text: string }
   | { kind: 'paragraph' | 'quote'; text: string }
@@ -15,9 +17,10 @@ type Block =
   | { kind: 'list'; ordered: boolean; items: string[] }
   | { kind: 'table'; rows: string[][] }
   | { kind: 'rule' }
+  | ImageBlock
   | CustomBlock;
 
-export async function ContentRenderer({ body }: { body: string }) {
+export async function ContentRenderer({ body, articleAds = false }: { body: string; articleAds?: boolean }) {
   const blocks = parseContent(body);
   const productIds = blocks.filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'affiliate').map((block) => block.argument).filter(Boolean);
   const [products, siteContent] = await Promise.all([
@@ -26,10 +29,20 @@ export async function ContentRenderer({ body }: { body: string }) {
   ]);
   const productMap = new Map(products.map((product) => [product.id, product]));
   const hasAffiliate = blocks.some((block) => isCustomBlock(block) && block.kind === 'affiliate' && productMap.has(block.argument));
+  const articleTopAfter = articleAds && blocks.length > 0 ? Math.min(1, blocks.length - 1) : -1;
+  const articleMiddleAfter = articleAds && blocks.length >= 6
+    ? Math.min(blocks.length - 2, Math.max(articleTopAfter + 2, Math.floor(blocks.length / 2)))
+    : -1;
 
   return (
     <div className="content-renderer grid gap-5 text-base leading-8 text-slate-200">
-      {blocks.map((block, index) => renderBlock(block, index, productMap, siteContent))}
+      {blocks.map((block, index) => (
+        <Fragment key={`content-block-${index}`}>
+          {renderBlock(block, index, productMap, siteContent)}
+          {index === articleTopAfter ? <ArticleTopAd className="my-5 w-full" /> : null}
+          {index === articleMiddleAfter ? <ArticleMiddleAd className="my-5 w-full" /> : null}
+        </Fragment>
+      ))}
       {hasAffiliate ? <p className="mt-2 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">{siteContent.affiliate_disclosure || 'Disclosure: We may earn a commission when you purchase through links on this page, at no additional cost to you.'}</p> : null}
     </div>
   );
@@ -63,7 +76,8 @@ function parseContent(body: string): Block[] {
       const content: string[] = [];
       index += 1;
       while (index < lines.length && lines[index].trim() !== ':::') content.push(lines[index++]);
-      if (['callout', 'faq', 'affiliate', 'email-signup', 'ad', 'checker'].includes(kind)) blocks.push({ kind: kind as 'callout', argument: argumentParts.join(' '), text: content.join('\n').trim() });
+      if (kind === 'image') { const image = parseImageBlock(content); if (image) blocks.push(image); }
+      else if (['callout', 'faq', 'affiliate', 'email-signup', 'ad', 'checker'].includes(kind)) blocks.push({ kind: kind as 'callout', argument: argumentParts.join(' '), text: content.join('\n').trim() });
       index += 1; continue;
     }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
@@ -106,6 +120,10 @@ function renderBlock(block: Block, index: number, products: Map<string, Awaited<
   if (block.kind === 'rule') return <hr className="border-white/10" key={key} />;
   if (block.kind === 'list') { const Tag = block.ordered ? 'ol' : 'ul'; return <Tag className={`grid gap-2 pl-6 ${block.ordered ? 'list-decimal' : 'list-disc'}`} key={key}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</Tag>; }
   if (block.kind === 'table') return <div className="overflow-x-auto" key={key}><table className="w-full border-collapse text-left text-sm"><thead><tr>{block.rows[0]?.map((cell, cellIndex) => <th className="border border-white/10 bg-white/5 p-3" key={cellIndex}>{inline(cell)}</th>)}</tr></thead><tbody>{block.rows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td className="border border-white/10 p-3" key={cellIndex}>{inline(cell)}</td>)}</tr>)}</tbody></table></div>;
+  if (block.kind === 'image') {
+    const image = <img alt={block.alt} className="max-h-[720px] w-full rounded-2xl object-contain" loading="lazy" referrerPolicy="no-referrer" src={block.url} />;
+    return <figure className={`my-5 ${imageSizeClass(block.size)} ${imageAlignClass(block.align)}`} key={key}>{block.link && safeUrl(block.link, false) ? <a href={block.link} rel={block.link.startsWith('/') ? undefined : 'noopener noreferrer'}>{image}</a> : image}{block.caption ? <figcaption className="mt-2 text-center text-sm leading-6 text-slate-500">{block.caption}</figcaption> : null}</figure>;
+  }
   if (block.kind === 'callout') return <aside className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-5 text-cyan-50" key={key}>{inline(block.text)}</aside>;
   if (block.kind === 'faq') { const item = faqParts(block.text); return <details className="rounded-2xl border border-white/10 bg-white/[0.03] p-4" key={key}><summary className="cursor-pointer font-black text-white">{item.question}</summary><p className="mt-3 text-slate-300">{inline(item.answer)}</p></details>; }
   if (block.kind === 'email-signup') return <EmailSignup description={siteContent.email_signup_description} heading={siteContent.email_signup_heading} key={key} signupSource="article" variant="article" />;
@@ -119,7 +137,7 @@ function inline(text: string): ReactNode[] {
   const pattern = /(!?\[[^\]]*\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
   return text.split(pattern).filter(Boolean).map((part, index) => {
     const image = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(part);
-    if (image && safeUrl(image[2], true)) return <img alt={image[1]} className="my-4 max-h-[560px] w-full rounded-2xl object-contain" key={index} loading="lazy" src={image[2]} />;
+    if (image && safeUrl(image[2], true)) return <img alt={image[1]} className="my-4 max-h-[560px] w-full rounded-2xl object-contain" key={index} loading="lazy" referrerPolicy="no-referrer" src={image[2]} />;
     const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
     if (link && safeUrl(link[2], false)) return <a className="font-bold text-violet-300 underline underline-offset-4" href={link[2]} key={index} rel={link[2].startsWith('/') ? undefined : 'noopener noreferrer'}>{link[1]}</a>;
     if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
@@ -134,4 +152,7 @@ function splitTableRow(line: string) { return line.trim().replace(/^\||\|$/g, ''
 function isSpecialLine(line: string) { return /^(#{1,6})\s+/.test(line) || line.startsWith('```') || line.startsWith(':::') || line.startsWith('> ') || /^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line) || /^\s*(---|\*\*\*)\s*$/.test(line); }
 function faqParts(text: string) { const lines = text.split('\n').map((line) => line.trim()).filter(Boolean); const question = (lines.find((line) => /^q:/i.test(line)) ?? lines[0] ?? '').replace(/^q:\s*/i, ''); const answer = (lines.find((line) => /^a:/i.test(line)) ?? lines.slice(1).join(' ')).replace(/^a:\s*/i, ''); return { question, answer }; }
 function isCustomBlock(block: Block): block is CustomBlock { return 'argument' in block; }
+function parseImageBlock(lines: string[]): ImageBlock | null { const fields = Object.fromEntries(lines.map((line) => { const separator = line.indexOf(':'); return separator < 0 ? ['', ''] : [line.slice(0, separator).trim().toLowerCase(), line.slice(separator + 1).trim()]; }).filter(([key]) => key)); const url = fields.url ?? ''; if (!safeUrl(url, true)) return null; const align = ['left', 'center', 'right', 'full'].includes(fields.align) ? fields.align as ImageBlock['align'] : 'center'; const size = ['small', 'medium', 'large', 'full'].includes(fields.size) ? fields.size as ImageBlock['size'] : 'large'; return { kind: 'image', url, alt: fields.alt ?? '', caption: fields.caption ?? '', align, size, link: fields.link ?? '' }; }
+function imageSizeClass(size: ImageBlock['size']) { if (size === 'small') return 'w-full max-w-sm'; if (size === 'medium') return 'w-full max-w-xl'; if (size === 'large') return 'w-full max-w-3xl'; return 'w-full max-w-none'; }
+function imageAlignClass(align: ImageBlock['align']) { if (align === 'left') return 'mr-auto'; if (align === 'right') return 'ml-auto'; return 'mx-auto'; }
 function toAffiliateProduct(product: Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>): AffiliateProductRecord { return { id: product.id, productId: product.id, sectionId: '', title: product.title, retailer: product.retailer as AffiliateProductRecord['retailer'], affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, priceText: product.defaultPriceText, badge: 'Recommended', shortDescription: product.shortDescription, buttonText: 'View Product', componentType: product.componentType as AffiliateProductRecord['componentType'], platform: product.platform as AffiliateProductRecord['platform'], enabled: product.enabled, displayOrder: 0, createdAt: product.createdAt.toISOString(), updatedAt: product.updatedAt.toISOString() }; }

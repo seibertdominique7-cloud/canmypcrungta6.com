@@ -9,7 +9,9 @@ import {
   type ProductRecord,
 } from '../../lib/affiliate-types';
 import type { ProductInput } from '../../lib/catalog-validation';
+import type { MediaAssetRecord, MediaFolderRecord } from '../../lib/cms-types';
 import { RecommendationProductCard } from '../RecommendationProductCard';
+import { AdminImageField } from './AdminImageField';
 import { AdminHeader } from './AdminHeader';
 
 interface ProductResponse {
@@ -22,12 +24,17 @@ interface ProductResponse {
 
 export function ProductCatalogDashboard({
   initialProducts,
+  initialMedia,
+  initialMediaFolders,
   openCreateForm = false,
 }: {
   initialProducts: ProductRecord[];
+  initialMedia: MediaAssetRecord[];
+  initialMediaFolders: MediaFolderRecord[];
   openCreateForm?: boolean;
 }) {
   const [products, setProducts] = useState(initialProducts);
+  const [media, setMedia] = useState(initialMedia);
   const [editor, setEditor] = useState<ProductRecord | 'new' | null>(
     openCreateForm ? 'new' : null,
   );
@@ -148,14 +155,14 @@ export function ProductCatalogDashboard({
       {editor ? (
         <Modal title={editor === 'new' ? 'Add product' : 'Edit product'} onClose={() => setEditor(null)}>
           {error ? <StatusMessage error={error}>{error}</StatusMessage> : null}
-          <ProductForm busy={busy} fieldErrors={fieldErrors} onSave={saveProduct} product={editor === 'new' ? null : editor} />
+          <ProductForm busy={busy} fieldErrors={fieldErrors} folders={initialMediaFolders} media={media} onMediaChange={setMedia} onSave={saveProduct} product={editor === 'new' ? null : editor} />
         </Modal>
       ) : null}
     </main>
   );
 }
 
-function ProductForm({ product, busy, fieldErrors, onSave }: { product: ProductRecord | null; busy: boolean; fieldErrors: Record<string, string>; onSave: (input: ProductInput, id?: string) => void }) {
+function ProductForm({ product, busy, fieldErrors, media, folders, onMediaChange, onSave }: { product: ProductRecord | null; busy: boolean; fieldErrors: Record<string, string>; media: MediaAssetRecord[]; folders: MediaFolderRecord[]; onMediaChange: (media: MediaAssetRecord[]) => void; onSave: (input: ProductInput, id?: string) => void }) {
   const [draft, setDraft] = useState<ProductInput>(() => product ? toProductInput(product) : {
     title: '', componentType: 'Other', affiliateUrl: '', imageUrl: null, shortDescription: '', retailer: 'Other', defaultPriceText: 'Check Current Price', platform: null, enabled: true,
   });
@@ -170,7 +177,7 @@ function ProductForm({ product, busy, fieldErrors, onSave }: { product: ProductR
       <Field error={errors.title} label="Title"><input className={inputClass} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="NVIDIA GeForce RTX 4070" value={draft.title} /></Field>
       <Field error={errors.componentType} label="Component type"><select className={inputClass} onChange={(event) => setDraft({ ...draft, componentType: event.target.value as ProductInput['componentType'] })} value={draft.componentType}>{PRODUCT_COMPONENT_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
       <Field error={errors.affiliateUrl} label="Affiliate URL"><input className={inputClass} onChange={(event) => setDraft({ ...draft, affiliateUrl: event.target.value })} placeholder="https://retailer.example/product" value={draft.affiliateUrl} /><span className="text-xs font-normal text-slate-500">Detected domain: {domain || 'Enter a valid HTTPS URL'}. The exact URL is preserved.</span></Field>
-      <Field error={errors.imageUrl} label="Image URL (optional)"><input className={inputClass} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value || null })} placeholder="https://..." value={draft.imageUrl ?? ''} /></Field>
+      <AdminImageField folders={folders} helpText={errors.imageUrl} label="Product image (optional)" media={media} onChange={(value) => setDraft({ ...draft, imageUrl: value || null })} onMediaChange={onMediaChange} value={draft.imageUrl ?? ''} />
       <Field error={errors.shortDescription} label="Description (optional)"><textarea className={`${inputClass} min-h-24 resize-y`} onChange={(event) => setDraft({ ...draft, shortDescription: event.target.value })} value={draft.shortDescription} /></Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field error={errors.retailer} label="Retailer"><select className={inputClass} onChange={(event) => setDraft({ ...draft, retailer: event.target.value as ProductInput['retailer'] })} value={draft.retailer}>{AFFILIATE_RETAILERS.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>

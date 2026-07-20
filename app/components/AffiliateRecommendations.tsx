@@ -13,6 +13,7 @@ import {
   isPassingRecommendationScenario,
 } from '../lib/monetization-policy';
 import { determineRecommendationScenario } from '../lib/recommendation-scenario';
+import { ResultsAd } from './ads/AdPlacements';
 import { RecommendationProductCard } from './RecommendationProductCard';
 
 export function AffiliateRecommendations({ result }: { result: CompatibilityResult }) {
@@ -157,6 +158,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
         <div className="contents" key={block.key}>
           {block.node}
           {index === 0 ? <AffiliateDisclosure /> : null}
+          {index === 0 ? <ResultsAd className="my-2 w-full" /> : null}
         </div>
       ))}
     </section>

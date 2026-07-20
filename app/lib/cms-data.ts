@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
+
 import type { Prisma } from '../../generated/prisma/client';
 import type {
   ArticleRecord,
@@ -8,6 +10,8 @@ import type {
   ContentTagRecord,
   ContentWorkspace,
   MediaAssetRecord,
+  MediaFolderRecord,
+  MediaUsageRecord,
   PageRecord,
   RedirectRecord,
   SiteContentRecord,
@@ -15,6 +19,7 @@ import type {
 import type { ArticleInput, PageInput } from './cms-validation';
 import { createSlug, validatePath } from './cms-validation';
 import { AdminDataError } from './admin-data-error';
+import { validateExternalImageUrl } from './media-validation';
 import { prisma } from './prisma';
 
 const articleInclude = {
@@ -26,14 +31,17 @@ const articleInclude = {
 type ArticleWithRelations = Prisma.ArticleGetPayload<{ include: typeof articleInclude }>;
 type CategoryWithCount = Prisma.ContentCategoryGetPayload<{ include: { _count: { select: { articles: true } } } }>;
 type TagWithCount = Prisma.ContentTagGetPayload<{ include: { _count: { select: { articles: true } } } }>;
+type MediaWithFolder = Prisma.MediaAssetGetPayload<{ include: { folder: true } }>;
+type MediaFolderWithCount = Prisma.MediaFolderGetPayload<{ include: { _count: { select: { media: true } } } }>;
 
 export async function getContentWorkspace(): Promise<ContentWorkspace> {
-  const [articles, pages, categories, tags, media, affiliateProducts, revisions] = await Promise.all([
+  const [articles, pages, categories, tags, media, mediaFolders, affiliateProducts, revisions] = await Promise.all([
     prisma.article.findMany({ orderBy: { updatedAt: 'desc' }, include: articleInclude }),
     prisma.contentPage.findMany({ orderBy: { updatedAt: 'desc' } }),
     prisma.contentCategory.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { articles: true } } } }),
     prisma.contentTag.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { articles: true } } } }),
-    prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' }, include: { folder: true } }),
+    prisma.mediaFolder.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { media: true } } } }),
     prisma.product.findMany({ orderBy: { title: 'asc' }, select: { id: true, title: true, enabled: true } }),
     prisma.contentRevision.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
@@ -43,6 +51,7 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
     categories: categories.map(serializeCategory),
     tags: tags.map(serializeTag),
     media: await Promise.all(media.map(serializeMedia)),
+    mediaFolders: mediaFolders.map(serializeMediaFolder),
     affiliateProducts,
   };
 }
@@ -349,29 +358,108 @@ export async function getRecentArticles(limit = 5) {
   return (await prisma.article.findMany({ where: publicArticleWhere(new Date()), orderBy: [{ publishedAt: 'desc' }, { scheduledAt: 'desc' }], take: limit, include: articleInclude })).map((item) => serializeArticle(item));
 }
 
+export async function getHomepageArticles(limit = 3) {
+  const now = new Date();
+  const items = await prisma.article.findMany({
+    where: {
+      status: 'published',
+      noindex: false,
+      robotsIndex: true,
+      OR: [{ publishedAt: null }, { publishedAt: { lte: now } }],
+    },
+    orderBy: [{ featured: 'desc' }, { publishedAt: 'desc' }, { createdAt: 'desc' }],
+    take: Math.min(3, Math.max(1, limit)),
+    include: articleInclude,
+  });
+  return items.map((item) => serializeArticle(item));
+}
+
 export async function getNavigationPages() {
   return prisma.contentPage.findMany({ where: { status: 'published', showInNavigation: true }, orderBy: [{ navigationOrder: 'asc' }, { title: 'asc' }], select: { slug: true, title: true, navigationLabel: true } });
 }
 
 export async function getMediaAssets(): Promise<MediaAssetRecord[]> {
-  return Promise.all((await prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' } })).map(serializeMedia));
+  return Promise.all((await prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' }, include: { folder: true } })).map(serializeMedia));
 }
 
-export async function createMediaAsset(input: { filename: string; url: string; mimeType: string; width: number | null; height: number | null; fileSize: number; altText: string; title: string; storageKey: string }) {
+export async function createMediaAsset(input: { filename: string; originalFilename: string; url: string; sourceType: 'upload' | 'external'; storageProvider: string; mimeType: string; width: number | null; height: number | null; fileSize: number; altText: string; title: string; storageKey: string; folderId?: string | null }) {
+  if (input.folderId) await requireMediaFolder(input.folderId);
   return prisma.mediaAsset.create({ data: input });
 }
 
-export async function updateMediaAsset(id: string, input: { altText: string; title: string }) {
-  return prisma.mediaAsset.update({ where: { id }, data: { altText: input.altText.trim().slice(0, 300), title: input.title.trim().slice(0, 180) } });
+export async function createExternalMediaAsset(input: { url: string; altText: string; title: string; folderId?: string | null }) {
+  const result = validateExternalImageUrl(input.url);
+  if (!result.ok) throw new AdminDataError(result.error, 400);
+  if (input.folderId) await requireMediaFolder(input.folderId);
+  const originalFilename = externalFilename(result.value);
+  return prisma.mediaAsset.create({ data: { filename: originalFilename, originalFilename, url: result.value, sourceType: 'external', storageProvider: 'external', mimeType: 'image/external', width: null, height: null, fileSize: 0, altText: input.altText.trim().slice(0, 300), title: input.title.trim().slice(0, 180) || originalFilename, storageKey: `external:${randomUUID()}`, folderId: input.folderId || null } });
+}
+
+export async function updateMediaAsset(id: string, input: { altText: string; title: string; folderId?: string | null }) {
+  if (input.folderId) await requireMediaFolder(input.folderId);
+  return prisma.mediaAsset.update({ where: { id }, data: { altText: input.altText.trim().slice(0, 300), title: input.title.trim().slice(0, 180), ...(input.folderId !== undefined ? { folderId: input.folderId || null } : {}) } });
 }
 
 export async function deleteMediaAsset(id: string) {
   const asset = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!asset) throw new AdminDataError('Media item not found.', 404);
-  const usageCount = await countMediaUsage(asset.url);
-  if (usageCount) throw new AdminDataError(`This image is still used in ${usageCount} content location${usageCount === 1 ? '' : 's'}.`, 409);
+  const usages = await getMediaUsage(asset.url);
+  if (usages.length) throw new AdminDataError(`This image is still used in ${usages.length} content location${usages.length === 1 ? '' : 's'}. Open “View usage” before replacing or removing it.`, 409);
   await prisma.mediaAsset.delete({ where: { id } });
   return asset;
+}
+
+export async function replaceMediaAsset(id: string, replacementId: string) {
+  if (id === replacementId) throw new AdminDataError('Choose a different replacement image.', 400);
+  const [asset, replacement] = await Promise.all([prisma.mediaAsset.findUnique({ where: { id } }), prisma.mediaAsset.findUnique({ where: { id: replacementId } })]);
+  if (!asset || !replacement) throw new AdminDataError('The original or replacement image could not be found.', 404);
+  const oldUrl = asset.url; const newUrl = replacement.url;
+  await prisma.$transaction(async (transaction) => {
+    const [articleBodies, pageBodies, siteValues] = await Promise.all([
+      transaction.article.findMany({ where: { body: { contains: oldUrl } }, select: { id: true, body: true } }),
+      transaction.contentPage.findMany({ where: { body: { contains: oldUrl } }, select: { id: true, body: true } }),
+      transaction.siteContent.findMany({ where: { value: { contains: oldUrl } }, select: { key: true, value: true } }),
+    ]);
+    await Promise.all([
+      transaction.article.updateMany({ where: { featuredImage: oldUrl }, data: { featuredImage: newUrl } }),
+      transaction.article.updateMany({ where: { openGraphImage: oldUrl }, data: { openGraphImage: newUrl } }),
+      transaction.article.updateMany({ where: { twitterImage: oldUrl }, data: { twitterImage: newUrl } }),
+      transaction.contentPage.updateMany({ where: { featuredImage: oldUrl }, data: { featuredImage: newUrl } }),
+      transaction.contentPage.updateMany({ where: { openGraphImage: oldUrl }, data: { openGraphImage: newUrl } }),
+      transaction.contentPage.updateMany({ where: { twitterImage: oldUrl }, data: { twitterImage: newUrl } }),
+      transaction.contentCategory.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      transaction.product.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      transaction.affiliateProduct.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      transaction.legacyAffiliateLink.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      transaction.gamePurchaseLink.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      ...articleBodies.map((item) => transaction.article.update({ where: { id: item.id }, data: { body: item.body.replaceAll(oldUrl, newUrl) } })),
+      ...pageBodies.map((item) => transaction.contentPage.update({ where: { id: item.id }, data: { body: item.body.replaceAll(oldUrl, newUrl) } })),
+      ...siteValues.map((item) => transaction.siteContent.update({ where: { key: item.key }, data: { value: item.value.replaceAll(oldUrl, newUrl) } })),
+    ]);
+    await transaction.mediaAsset.delete({ where: { id } });
+  });
+  return asset;
+}
+
+export async function getMediaFolders(): Promise<MediaFolderRecord[]> {
+  return (await prisma.mediaFolder.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { media: true } } } })).map(serializeMediaFolder);
+}
+
+export async function saveMediaFolder(input: { name: string }, id?: string) {
+  const name = input.name.trim().slice(0, 80); const slug = createSlug(name);
+  if (!name || !slug) throw new AdminDataError('Folder name is required.', 400);
+  const duplicate = await prisma.mediaFolder.findFirst({ where: { slug, ...(id ? { id: { not: id } } : {}) } });
+  if (duplicate) throw new AdminDataError('A media folder with that name already exists.', 409);
+  if (id) return prisma.mediaFolder.update({ where: { id }, data: { name, slug } });
+  const maximum = await prisma.mediaFolder.aggregate({ _max: { displayOrder: true } });
+  return prisma.mediaFolder.create({ data: { name, slug, displayOrder: (maximum._max.displayOrder ?? 0) + 10 } });
+}
+
+export async function deleteMediaFolder(id: string) {
+  const folder = await prisma.mediaFolder.findUnique({ where: { id }, include: { _count: { select: { media: true } } } });
+  if (!folder) throw new AdminDataError('Media folder not found.', 404);
+  if (folder._count.media) throw new AdminDataError('Move images out of this folder before deleting it.', 409);
+  await prisma.mediaFolder.delete({ where: { id } });
 }
 
 export async function getCmsSummary() {
@@ -514,18 +602,40 @@ async function trimRevisions(kind: 'article' | 'page', contentId: string) {
   if (expired.length) await prisma.contentRevision.deleteMany({ where: { id: { in: expired.map((item) => item.id) } } });
 }
 
-async function countMediaUsage(url: string) {
-  const [articles, pages, categories] = await Promise.all([
-    prisma.article.count({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] } }),
-    prisma.contentPage.count({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] } }),
-    prisma.contentCategory.count({ where: { imageUrl: url } }),
+async function getMediaUsage(url: string): Promise<MediaUsageRecord[]> {
+  const [articles, pages, categories, products, legacyProducts, siteContent] = await Promise.all([
+    prisma.article.findMany({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] }, select: { id: true, title: true, featuredImage: true, openGraphImage: true, twitterImage: true, body: true } }),
+    prisma.contentPage.findMany({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] }, select: { id: true, title: true, featuredImage: true, openGraphImage: true, twitterImage: true, body: true } }),
+    prisma.contentCategory.findMany({ where: { imageUrl: url }, select: { id: true, name: true } }),
+    prisma.product.findMany({ where: { imageUrl: url }, select: { id: true, title: true } }),
+    prisma.affiliateProduct.findMany({ where: { imageUrl: url }, select: { id: true, title: true } }),
+    prisma.siteContent.findMany({ where: { value: { contains: url } }, select: { key: true, label: true } }),
   ]);
-  return articles + pages + categories;
+  const usages: MediaUsageRecord[] = [];
+  const addContent = (kind: 'article' | 'page', item: typeof articles[number] | typeof pages[number]) => {
+    const adminUrl = `/admin/${kind}s`; const prefix = `${kind}:${item.id}`;
+    if (item.featuredImage === url) usages.push({ id: `${prefix}:featured`, kind, location: 'Featured image', label: item.title, adminUrl });
+    if (item.openGraphImage === url) usages.push({ id: `${prefix}:og`, kind, location: 'Open Graph image', label: item.title, adminUrl });
+    if (item.twitterImage === url) usages.push({ id: `${prefix}:twitter`, kind, location: 'Twitter image', label: item.title, adminUrl });
+    if (item.body.includes(url)) usages.push({ id: `${prefix}:body`, kind, location: 'Body image', label: item.title, adminUrl });
+  };
+  articles.forEach((item) => addContent('article', item)); pages.forEach((item) => addContent('page', item));
+  categories.forEach((item) => usages.push({ id: `category:${item.id}`, kind: 'category', location: 'Category image', label: item.name, adminUrl: '/admin/categories' }));
+  products.forEach((item) => usages.push({ id: `product:${item.id}`, kind: 'affiliate-product', location: 'Product image', label: item.title, adminUrl: '/admin/products' }));
+  legacyProducts.forEach((item) => usages.push({ id: `affiliate-product:${item.id}`, kind: 'affiliate-product', location: 'Legacy recommendation product', label: item.title, adminUrl: '/admin/recommendations' }));
+  siteContent.forEach((item) => usages.push({ id: `site-content:${item.key}`, kind: 'site-content', location: 'Site content', label: item.label, adminUrl: '/admin/site-content' }));
+  return usages;
 }
 
-async function serializeMedia(item: Awaited<ReturnType<typeof prisma.mediaAsset.findFirstOrThrow>>): Promise<MediaAssetRecord> {
-  return { ...item, usageCount: await countMediaUsage(item.url), createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() };
+async function serializeMedia(item: MediaWithFolder): Promise<MediaAssetRecord> {
+  const usages = await getMediaUsage(item.url);
+  return { ...item, sourceType: item.sourceType === 'external' ? 'external' : 'upload', storageProvider: normalizeStorageProvider(item.storageProvider), folder: item.folder ? { ...item.folder, mediaCount: 0, createdAt: item.folder.createdAt.toISOString(), updatedAt: item.folder.updatedAt.toISOString() } : null, usageCount: usages.length, usages, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() };
 }
+
+function serializeMediaFolder(item: MediaFolderWithCount): MediaFolderRecord { return { id: item.id, name: item.name, slug: item.slug, displayOrder: item.displayOrder, mediaCount: item._count.media, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }; }
+async function requireMediaFolder(id: string) { if (!(await prisma.mediaFolder.findUnique({ where: { id }, select: { id: true } }))) throw new AdminDataError('Media folder not found.', 400); }
+function externalFilename(value: string) { try { const raw = decodeURIComponent(new URL(value).pathname.split('/').filter(Boolean).pop() ?? 'external-image'); return raw.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(0, 180) || 'external-image'; } catch { return 'external-image'; } }
+function normalizeStorageProvider(value: string): MediaAssetRecord['storageProvider'] { return value === 'vercel-blob' || value === 'cloudinary' || value === 's3' || value === 'external' ? value : 'local'; }
 
 function serializeArticle(article: ArticleWithRelations, revisions: Prisma.ContentRevisionGetPayload<Record<string, never>>[] = []): ArticleRecord {
   return {

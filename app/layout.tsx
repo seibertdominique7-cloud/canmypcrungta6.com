@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AdsenseScript } from './components/ads/AdsenseScript';
+import { AdConfigurationProvider } from './components/ads/AdConfigurationProvider';
+import { FooterAd } from './components/ads/AdPlacements';
 import { SiteFooter } from './components/SiteFooter';
+import { getPublicAdConfiguration } from './lib/ad-data';
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,20 +22,26 @@ export const metadata: Metadata = {
   description: "Check if your gaming PC meets the current requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const adConfiguration = await getPublicAdConfiguration();
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
-        <SiteFooter />
-        <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'CanMyPCRunGTA6', url: process.env.SITE_URL || 'http://localhost:3000' }).replace(/</g, '\\u003c') }} type="application/ld+json" />
+        <AdConfigurationProvider initialConfiguration={adConfiguration}>
+          {children}
+          <FooterAd className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6" />
+          <SiteFooter />
+          <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'CanMyPCRunGTA6', url: process.env.SITE_URL || 'http://localhost:3000' }).replace(/</g, '\\u003c') }} type="application/ld+json" />
+          <AdsenseScript />
+        </AdConfigurationProvider>
       </body>
     </html>
   );

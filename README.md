@@ -50,9 +50,18 @@ metadata, sitemap entries, news sitemap entries, and the RSS feed include only e
 or due scheduled content.
 
 Image uploads use a storage abstraction. `MEDIA_STORAGE_PROVIDER="local"` writes to
-`public/uploads` for local development only; it intentionally refuses permanent production uploads.
-Add a Vercel Blob, Cloudinary, or S3-compatible adapter before enabling production media uploads.
-Set `SITE_URL` to the deployed canonical origin so metadata, feeds, and sitemaps use production URLs.
+`public/uploads` for local development only and is intentionally blocked in production. The Media
+admin shows a warning when the selected provider is incomplete. Supported provider values are
+`local`, `vercel-blob`, `cloudinary`, and `s3`.
+
+- Vercel Blob requires `BLOB_READ_WRITE_TOKEN`.
+- Cloudinary requires `CLOUDINARY_URL`.
+- S3 requires `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`.
+- S3-compatible services can also set `S3_ENDPOINT` and `S3_PUBLIC_BASE_URL`.
+- `MEDIA_MAX_UPLOAD_MB` controls the upload limit (8 MB by default).
+
+External images are stored as their exact HTTPS URL and are not copied into upload storage. Set
+`SITE_URL` to the deployed canonical origin so metadata, feeds, and sitemaps use production URLs.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

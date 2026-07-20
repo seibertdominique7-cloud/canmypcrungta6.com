@@ -1,10 +1,11 @@
-export type AdminSection = 'dashboard' | 'recommendations' | 'products' | 'subscribers' | 'articles' | 'pages' | 'categories' | 'tags' | 'media' | 'site-content' | 'redirects' | 'settings';
+export type AdminSection = 'dashboard' | 'recommendations' | 'products' | 'ads' | 'subscribers' | 'articles' | 'pages' | 'categories' | 'tags' | 'media' | 'site-content' | 'redirects' | 'settings';
 
-const links: Array<{ href: string; label: string; section: AdminSection; group: 'Core' | 'Content' | 'System' }> = [
+const links: Array<{ href: string; label: string; section: AdminSection; group: 'Core' | 'Monetization' | 'Content' | 'System' }> = [
   { href: '/admin', label: 'Dashboard', section: 'dashboard', group: 'Core' },
-  { href: '/admin/recommendations', label: 'Recommendations', section: 'recommendations', group: 'Core' },
-  { href: '/admin/products', label: 'Affiliate Products', section: 'products', group: 'Core' },
   { href: '/admin/subscribers', label: 'Subscribers', section: 'subscribers', group: 'Core' },
+  { href: '/admin/recommendations', label: 'Recommendations', section: 'recommendations', group: 'Monetization' },
+  { href: '/admin/products', label: 'Affiliate Products', section: 'products', group: 'Monetization' },
+  { href: '/admin/ads', label: 'Ads', section: 'ads', group: 'Monetization' },
   { href: '/admin/articles', label: 'Articles', section: 'articles', group: 'Content' },
   { href: '/admin/pages', label: 'Pages', section: 'pages', group: 'Content' },
   { href: '/admin/categories', label: 'Categories', section: 'categories', group: 'Content' },
@@ -23,11 +24,10 @@ export function AdminHeader({ active }: { active: AdminSection }) {
         <form action="/api/admin/logout" method="post"><button className={navClass(false)} type="submit">Log out</button></form>
       </div>
       <nav aria-label="Admin navigation" className="mt-4 grid gap-3">
-        {(['Core', 'Content', 'System'] as const).map((group) => <div className="flex flex-wrap items-center gap-2" key={group}><span className="w-14 text-[10px] font-black uppercase tracking-wider text-slate-600">{group}</span>{links.filter((link) => link.group === group).map((link) => <a aria-current={active === link.section ? 'page' : undefined} className={navClass(active === link.section)} href={link.href} key={link.section}>{link.label}</a>)}</div>)}
+        {(['Core', 'Monetization', 'Content', 'System'] as const).map((group) => <div className="flex flex-wrap items-center gap-2" key={group}><span className="w-24 text-[10px] font-black uppercase tracking-wider text-slate-600">{group}</span>{links.filter((link) => link.group === group).map((link) => <a aria-current={active === link.section ? 'page' : undefined} className={navClass(active === link.section)} href={link.href} key={link.section}>{link.label}</a>)}</div>)}
       </nav>
     </header>
   );
 }
 
 function navClass(active: boolean) { return `rounded-xl border px-3 py-2 text-xs font-bold transition ${active ? 'border-violet-400/50 bg-violet-500 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'}`; }
-
