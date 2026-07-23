@@ -1,6 +1,14 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { ManualEntryWorkflow } from '../components/ManualEntryWorkflow';
+import { publicPageMetadata } from '../lib/seo';
+
+export const metadata: Metadata = publicPageMetadata({
+  title: 'Manual GTA VI PC Compatibility Check',
+  description: 'Enter your CPU, GPU, RAM, storage, and Windows version to check estimated GTA VI PC compatibility.',
+  path: '/manual',
+});
 
 export default function ManualEntryPage() {
   return (

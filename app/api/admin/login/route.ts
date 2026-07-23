@@ -6,6 +6,7 @@ import {
   isRequestSameOrigin,
   verifyAdminPassword,
 } from '../../../lib/admin-auth';
+import { consumeRateLimit, getRequestClientKey } from '../../../lib/rate-limit';
 
 export async function POST(request: Request) {
   if (!isRequestSameOrigin(request)) {
@@ -25,6 +26,18 @@ export async function POST(request: Request) {
   if (getAdminConfigurationError()) {
     loginUrl.searchParams.set('error', 'config');
     return NextResponse.redirect(loginUrl, 303);
+  }
+
+  const rateLimit = consumeRateLimit(`admin-login:${getRequestClientKey(request)}`, {
+    limit: 8,
+    windowMs: 15 * 60 * 1_000,
+  });
+
+  if (!rateLimit.allowed) {
+    loginUrl.searchParams.set('error', 'rate-limit');
+    const response = NextResponse.redirect(loginUrl, 303);
+    response.headers.set('Retry-After', String(rateLimit.retryAfterSeconds));
+    return response;
   }
 
   if (typeof password !== 'string' || !verifyAdminPassword(password)) {

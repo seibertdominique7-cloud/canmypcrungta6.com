@@ -503,6 +503,8 @@ function logRamPipeline(
   parsedHardware: HardwareParseResult,
   editableSpecs: EditableHardwareSpecs,
 ) {
+  if (process.env.NODE_ENV === 'production') return;
+
   const compatibility = evaluateCompatibility(editableSpecs, parsedHardware.specs);
   const resultRam = compatibility.components.find((component) => component.key === 'ram');
   const { ramTrace } = parsedHardware;

@@ -50,7 +50,7 @@ function ArticleCard({ article }: { article: ArticleRecord }) {
   );
 }
 
-function ArticleImage({ article, className }: { article: ArticleRecord; className: string }) { return article.featuredImage ? <img alt="" className={className} decoding="async" loading="lazy" referrerPolicy="no-referrer" src={article.featuredImage} /> : <div aria-hidden="true" className={`${className} bg-gradient-to-br from-violet-500/25 via-slate-950 to-cyan-500/15`} />; }
+function ArticleImage({ article, className }: { article: ArticleRecord; className: string }) { return article.featuredImage ? <img alt={`${article.title} featured image`} className={className} decoding="async" loading="lazy" referrerPolicy="no-referrer" src={article.featuredImage} /> : <div aria-hidden="true" className={`${className} bg-gradient-to-br from-violet-500/25 via-slate-950 to-cyan-500/15`} />; }
 function CategoryPill({ name, slug }: { name: string; slug?: string }) { const className = 'w-fit rounded-full border border-violet-400/25 bg-violet-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-violet-200'; return slug ? <a className={className} href={`/category/${slug}`}>{name}</a> : <span className={className}>{name}</span>; }
 function ArticleMeta({ article }: { article: ArticleRecord }) { const date = article.publishedAt ?? article.createdAt; return <p className="mt-auto pt-5 text-xs text-slate-500"><time dateTime={date}>{formatDate(date)}</time><span aria-hidden="true" className="mx-2">•</span>{estimateReadingTime(article.body)} min read</p>; }
 function primaryCategory(article: ArticleRecord) { return article.categories.find((item) => item.isPrimary) ?? article.categories[0]; }

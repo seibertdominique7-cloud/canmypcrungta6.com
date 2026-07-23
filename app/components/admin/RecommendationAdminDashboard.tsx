@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-html-link-for-pages -- The catalog link intentionally performs a full authenticated navigation. */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import {
   AFFILIATE_BADGES,
@@ -13,6 +13,7 @@ import {
 import type { AssignmentInput, AssignmentUpdateInput } from '../../lib/catalog-validation';
 import { RecommendationProductCard } from '../RecommendationProductCard';
 import { AdminHeader } from './AdminHeader';
+import { CatalogProductPicker } from './CatalogProductPicker';
 
 interface WorkspaceResponse {
   error?: string;
@@ -155,14 +156,12 @@ export function RecommendationAdminDashboard({ initialWorkspace }: { initialWork
 function AssignmentForm({ workspace, currentSectionId, source, busy, fieldErrors, onSave }: { workspace: RecommendationWorkspace; currentSectionId: string; source: RecommendationAssignmentRecord | null; busy: boolean; fieldErrors: Record<string, string>; onSave: (input: AssignmentInput) => void }) {
   const [productIds, setProductIds] = useState<string[]>(source ? [source.productId] : []);
   const [sectionIds, setSectionIds] = useState<string[]>(source ? [] : currentSectionId ? [currentSectionId] : []);
-  const [query, setQuery] = useState('');
   const [badge, setBadge] = useState<AssignmentInput['badge']>(source?.badge ?? 'None');
   const [buttonText, setButtonText] = useState(source?.buttonText ?? 'View Product');
   const [overridePriceText, setOverridePriceText] = useState(source?.overridePriceText ?? '');
   const [overrideDescription, setOverrideDescription] = useState(source?.overrideDescription ?? '');
   const [enabled, setEnabled] = useState(source?.enabled ?? true);
   const [displayOrder, setDisplayOrder] = useState('');
-  const products = useMemo(() => workspace.products.filter((product) => `${product.title} ${product.componentType} ${product.retailer}`.toLowerCase().includes(query.trim().toLowerCase())), [query, workspace.products]);
   const localErrors = { ...fieldErrors };
   if (productIds.length === 0) localErrors.productIds = 'Choose at least one product.';
   if (sectionIds.length === 0) localErrors.sectionIds = 'Choose at least one destination section.';
@@ -171,7 +170,7 @@ function AssignmentForm({ workspace, currentSectionId, source, busy, fieldErrors
   const toggleScenario = (sectionIdsForScenario: string[], checked: boolean) => setSectionIds((current) => checked ? Array.from(new Set([...current, ...sectionIdsForScenario])) : current.filter((id) => !sectionIdsForScenario.includes(id)));
 
   return <form className="mt-4 grid gap-5" onSubmit={(event) => { event.preventDefault(); if (productIds.length && sectionIds.length && buttonText.trim()) onSave({ productIds, sectionIds, badge, buttonText, overridePriceText: overridePriceText.trim() || null, overrideDescription: overrideDescription.trim() || null, enabled, displayOrder: displayOrder === '' ? null : Number(displayOrder) }); }}>
-    <section><div className="flex items-center justify-between gap-3"><h3 className="font-black">Products</h3><a className={secondaryButton} href="/admin/products?new=1">Create New Product</a></div><input aria-label="Search catalog products" className={`${inputClass} mt-3`} onChange={(event) => setQuery(event.target.value)} placeholder="Search existing products" type="search" value={query} /><div className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1">{products.map((product) => <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm" key={product.id}><input checked={productIds.includes(product.id)} className="size-4 accent-violet-500" disabled={Boolean(source)} onChange={(event) => setProductIds((current) => event.target.checked ? [...current, product.id] : current.filter((id) => id !== product.id))} type="checkbox" /><span><span className="block font-bold">{product.title}</span><span className="text-xs text-slate-500">{product.componentType} · {product.retailer}</span></span></label>)}</div>{localErrors.productIds ? <FieldError>{localErrors.productIds}</FieldError> : null}</section>
+    <section><div className="mb-3 flex items-center justify-between gap-3"><h3 className="font-black">Products</h3><a className={secondaryButton} href="/admin/products?new=1">Create New Product</a></div><CatalogProductPicker onSelectionChange={setProductIds} products={workspace.products} selectedProductIds={productIds} selectionLocked={Boolean(source)} />{localErrors.productIds ? <FieldError>{localErrors.productIds}</FieldError> : null}</section>
     <section><h3 className="font-black">Destination scenarios and sections</h3><div className="mt-3 grid max-h-72 gap-3 overflow-y-auto pr-1">{workspace.scenarios.map((scenario) => { const scenarioSectionIds = scenario.sections.map((section) => section.id); const allSelected = scenarioSectionIds.length > 0 && scenarioSectionIds.every((id) => sectionIds.includes(id)); return <div className="rounded-xl border border-white/10 bg-black/20 p-3" key={scenario.id}><label className="flex items-center gap-2 text-sm font-black"><input checked={allSelected} className="size-4 accent-violet-500" onChange={(event) => toggleScenario(scenarioSectionIds, event.target.checked)} type="checkbox" />{scenario.code}</label><div className="mt-2 grid gap-2 pl-6">{scenario.sections.map((section) => <label className="flex items-center gap-2 text-sm text-slate-300" key={section.id}><input checked={sectionIds.includes(section.id)} className="size-4 accent-violet-500" onChange={(event) => setSectionIds((current) => event.target.checked ? [...current, section.id] : current.filter((id) => id !== section.id))} type="checkbox" />{section.title}</label>)}</div></div>; })}</div>{localErrors.sectionIds ? <FieldError>{localErrors.sectionIds}</FieldError> : null}</section>
     <div className="grid gap-4 sm:grid-cols-2"><Field label="Badge"><select className={inputClass} onChange={(event) => setBadge(event.target.value as AssignmentInput['badge'])} value={badge}>{AFFILIATE_BADGES.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field><Field error={localErrors.buttonText} label="Button text"><input className={inputClass} onChange={(event) => setButtonText(event.target.value)} value={buttonText} /></Field></div>
     <Field error={localErrors.overridePriceText} label="Price override (optional)"><input className={inputClass} onChange={(event) => setOverridePriceText(event.target.value)} placeholder="Uses catalog default when blank" value={overridePriceText} /></Field>

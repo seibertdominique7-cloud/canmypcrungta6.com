@@ -67,11 +67,7 @@ export function EmailSignup(props: EmailSignupProps) {
         throw new Error(payload.error || 'We could not complete your subscription.');
       }
 
-      setMessage(
-        payload.status === 'already-subscribed'
-          ? "You're already subscribed."
-          : "You're subscribed. We'll send GTA VI updates to your email.",
-      );
+      setMessage(payload.message || "You're subscribed. We'll send GTA VI updates to your email.");
       setEmail('');
       setCompany('');
     } catch (requestError) {

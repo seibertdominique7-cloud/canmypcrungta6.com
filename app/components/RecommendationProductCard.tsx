@@ -21,12 +21,17 @@ export function RecommendationProductCard({
   preview = false,
   compact = false,
   categoryLabel,
+  headingLevel = 'h3',
+  onAction,
 }: {
   product: RecommendationCardProduct;
   preview?: boolean;
   compact?: boolean;
   categoryLabel?: string;
+  headingLevel?: 'h2' | 'h3';
+  onAction?: () => void;
 }) {
+  const Heading = headingLevel;
   const buttonText = getPublicButtonText(product.buttonText, product.retailer);
   const retailerLabel = product.retailer === 'Other' ? 'Retailer link' : product.retailer;
   const callToActionClass =
@@ -79,11 +84,11 @@ export function RecommendationProductCard({
           </p>
         ) : null}
         <div className="flex items-start justify-between gap-3">
-          <h3
+          <Heading
             className={`${compact ? 'text-lg' : 'text-xl'} font-black leading-tight tracking-tight text-white`}
           >
             {product.title || 'Product title'}
-          </h3>
+          </Heading>
           {product.platform ? (
             <span className="shrink-0 rounded-lg bg-violet-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200">
               {product.platform}
@@ -94,7 +99,7 @@ export function RecommendationProductCard({
         <p
           className={`${compact ? 'line-clamp-2' : 'line-clamp-3'} mt-3 text-sm leading-6 text-slate-400`}
         >
-          {product.shortDescription || 'Add a concise product description in the admin panel.'}
+          {product.shortDescription || 'View current specifications, availability, and pricing from the retailer.'}
         </p>
 
         <div className="mt-auto pt-5">
@@ -121,6 +126,7 @@ export function RecommendationProductCard({
             <a
               className={callToActionClass}
               href={product.affiliateUrl}
+              onClick={onAction}
               rel="sponsored nofollow noopener noreferrer"
               target="_blank"
             >

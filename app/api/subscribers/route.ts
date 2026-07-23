@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 
 import { isRequestSameOrigin } from '../../lib/admin-auth';
+import { syncSubscriberToBrevo, type BrevoSubscriberSyncResult } from '../../lib/brevo';
 import { getRequestClientKey, consumeRateLimit } from '../../lib/rate-limit';
 import { subscribeEmail } from '../../lib/subscriber-data';
+import { saveSubscriberThenSyncBrevo } from '../../lib/subscriber-sync';
 import { validateSubscriberSignup } from '../../lib/subscriber-validation';
 
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -47,15 +49,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const outcome = await subscribeEmail(validation.data);
+    const { outcome, brevo } = await saveSubscriberThenSyncBrevo(validation.data, {
+      saveLocally: subscribeEmail,
+      syncWithBrevo: syncSubscriberToBrevo,
+    });
 
     if (outcome === 'suppressed') {
       return subscriberResponse({ error: 'This email address cannot be subscribed.' }, 409);
     }
 
+    const brevoSynced = brevo.status === 'synced';
+    if (!brevoSynced) logBrevoFailure(brevo);
+
     if (outcome === 'already-subscribed') {
       return subscriberResponse(
-        { status: outcome, message: "You're already subscribed." },
+        {
+          status: outcome,
+          message: brevoSynced
+            ? "You're already subscribed."
+            : 'Your subscription is saved. Email delivery is temporarily delayed.',
+          ...developmentBrevoDetails(brevo),
+        },
         200,
       );
     }
@@ -63,7 +77,10 @@ export async function POST(request: Request) {
     return subscriberResponse(
       {
         status: outcome,
-        message: "You're subscribed. We'll send GTA VI updates to your email.",
+        message: brevoSynced
+          ? "You're subscribed. We'll send GTA VI updates to your email."
+          : 'Your subscription is saved. Email delivery is temporarily delayed.',
+        ...developmentBrevoDetails(brevo),
       },
       201,
     );
@@ -77,6 +94,42 @@ export async function POST(request: Request) {
       500,
     );
   }
+}
+
+function logBrevoFailure(result: Extract<BrevoSubscriberSyncResult, { status: 'failed' }>) {
+  if (result.reason === 'configuration') {
+    console.error(
+      '[subscriber signup] Brevo sync was not attempted after the local save.',
+      result.issues.join(' '),
+    );
+    return;
+  }
+
+  console.error(
+    `[subscriber signup] Brevo sync failed after the local save. ${JSON.stringify({
+      reason: result.reason,
+      ...(result.httpStatus ? { httpStatus: result.httpStatus } : {}),
+      ...(result.safeMessage ? { message: result.safeMessage } : {}),
+    })}`,
+  );
+}
+
+function developmentBrevoDetails(result: BrevoSubscriberSyncResult) {
+  if (process.env.NODE_ENV !== 'development' || result.status === 'synced') return {};
+
+  return {
+    brevoSync: {
+      status: result.status,
+      reason: result.reason,
+      ...('httpStatus' in result && result.httpStatus
+        ? { httpStatus: result.httpStatus }
+        : {}),
+      ...('safeMessage' in result && result.safeMessage
+        ? { message: result.safeMessage }
+        : {}),
+      ...('issues' in result ? { issues: result.issues } : {}),
+    },
+  };
 }
 
 async function readRequestJson(request: Request) {

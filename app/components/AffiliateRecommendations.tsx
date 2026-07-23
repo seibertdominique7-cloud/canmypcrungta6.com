@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 
 import type {
   PublicMonetizationPayload,
@@ -28,7 +29,9 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
   useEffect(() => {
     const controller = new AbortController();
 
-    console.info(`[recommendations] Detected scenario: ${scenarioCode}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[recommendations] Detected scenario: ${scenarioCode}`);
+    }
 
     fetch(`/api/monetization?scenario=${encodeURIComponent(scenarioCode)}`, {
       signal: controller.signal,
@@ -39,17 +42,19 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
         return (await response.json()) as PublicMonetizationPayload;
       })
       .then((payload) => {
-        console.info('[recommendations] Database response', {
-          detectedScenario: scenarioCode,
-          sectionsFound: payload?.debug?.sectionsFound ?? payload?.sections.length ?? 0,
-          productsFound:
-            payload?.debug?.productsFound ??
-            payload?.sections.reduce(
-              (total, section) => total + section.products.length,
+        if (process.env.NODE_ENV !== 'production') {
+          console.info('[recommendations] Database response', {
+            detectedScenario: scenarioCode,
+            sectionsFound: payload?.debug?.sectionsFound ?? payload?.sections.length ?? 0,
+            productsFound:
+              payload?.debug?.productsFound ??
+              payload?.sections.reduce(
+                (total, section) => total + section.products.length,
+                0,
+              ) ??
               0,
-            ) ??
-            0,
-        });
+          });
+        }
         setRequestState({ scenarioCode, payload, loaded: true, error: null });
       })
       .catch((error: unknown) => {
@@ -143,13 +148,18 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
   }
 
   if (!payload || monetizedBlocks.length === 0) {
-    return process.env.NODE_ENV !== 'production' ? (
-      <RecommendationDebug
-        debug={payload?.debug}
-        detectedScenario={scenarioCode}
-        error={loadingError}
-      />
-    ) : null;
+    return (
+      <section aria-label="Recommendations" className="grid gap-4">
+        {process.env.NODE_ENV !== 'production' ? (
+          <RecommendationDebug
+            debug={payload?.debug}
+            detectedScenario={scenarioCode}
+            error={loadingError}
+          />
+        ) : null}
+        <RecommendationFallback unavailable={Boolean(loadingError)} />
+      </section>
+    );
   }
 
   return (
@@ -162,6 +172,24 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
         </div>
       ))}
     </section>
+  );
+}
+
+function RecommendationFallback({ unavailable }: { unavailable: boolean }) {
+  return (
+    <aside className="theme-glass-card rounded-2xl p-4 sm:p-5">
+      <h2 className="text-base font-black text-white">
+        {unavailable ? 'Product recommendations are temporarily unavailable' : 'No matching product recommendations are available yet'}
+      </h2>
+      <p className="mt-1 text-sm leading-6 text-slate-400">
+        {unavailable
+          ? 'Your compatibility result above is still valid. You can browse the latest GTA VI hardware guides while recommendations recover.'
+          : 'Your compatibility result above is complete. Browse the latest GTA VI hardware guides for practical upgrade and setup advice.'}
+      </p>
+      <Link className="theme-link mt-3 inline-flex text-sm font-bold" href="/articles">
+        Browse GTA VI guides &rarr;
+      </Link>
+    </aside>
   );
 }
 

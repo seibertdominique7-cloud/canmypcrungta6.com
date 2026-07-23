@@ -164,6 +164,69 @@ body {
   color: #fbcfe8;
 }
 
+.cms-admin-editor > * {
+  border-radius: 0.55rem;
+  margin-inline: -0.4rem;
+  outline: 1px solid transparent;
+  padding-inline: 0.4rem;
+  transition: background-color 120ms ease, outline-color 120ms ease;
+}
+
+.cms-admin-editor > *:hover {
+  background: rgb(255 255 255 / 2.5%);
+  outline-color: rgb(255 255 255 / 7%);
+}
+
+.cms-admin-editor > [data-editor-active="true"] {
+  background: rgb(139 92 246 / 8%);
+  outline-color: rgb(167 139 250 / 42%);
+}
+
+.cms-admin-editor > cms-affiliate[data-editor-active="true"],
+.cms-admin-editor > cms-block[data-editor-active="true"],
+.cms-admin-editor > figure[data-editor-active="true"] {
+  box-shadow: 0 0 0 3px rgb(139 92 246 / 10%);
+}
+
+.cms-admin-editor [data-align="center"],
+.cms-rich-content [data-align="center"],
+.cms-draft-preview [data-align="center"] {
+  text-align: center;
+}
+
+.cms-admin-editor [data-align="right"],
+.cms-rich-content [data-align="right"],
+.cms-draft-preview [data-align="right"] {
+  text-align: right;
+}
+
+.cms-admin-editor [data-align="left"],
+.cms-rich-content [data-align="left"],
+.cms-draft-preview [data-align="left"] {
+  text-align: left;
+}
+
+.cms-admin-editor [data-text-size="small"],
+.cms-rich-content [data-text-size="small"],
+.cms-draft-preview [data-text-size="small"] {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.cms-admin-editor [data-text-size="large"],
+.cms-rich-content [data-text-size="large"],
+.cms-draft-preview [data-text-size="large"] {
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.cms-admin-editor [data-text-size="x-large"],
+.cms-rich-content [data-text-size="x-large"],
+.cms-draft-preview [data-text-size="x-large"] {
+  font-size: 1.375rem;
+  line-height: 1.55;
+}
+
 @media (max-width: 768px) {
   .public-theme {
     background-attachment: scroll;

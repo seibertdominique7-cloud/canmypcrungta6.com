@@ -26,6 +26,8 @@ export default async function AffiliateAdminLoginPage({
     ? configurationError
     : error === 'invalid'
       ? 'The password was not accepted.'
+      : error === 'rate-limit'
+        ? 'Too many sign-in attempts. Wait a few minutes and try again.'
       : null;
 
   return (

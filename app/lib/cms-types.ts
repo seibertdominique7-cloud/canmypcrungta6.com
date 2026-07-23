@@ -1,4 +1,5 @@
 import type { AffiliateRetailer, ProductComponentType } from './affiliate-types';
+import type { FooterGroup, RequiredPageKey } from '../data/required-pages';
 
 export const CONTENT_STATUSES = ['draft', 'published', 'scheduled', 'archived'] as const;
 export const ARTICLE_CONTENT_TYPES = ['standard', 'news', 'hardware-guide', 'comparison', 'faq', 'deals', 'tutorial'] as const;
@@ -57,6 +58,7 @@ export interface ContentRevisionRecord {
   contentKind: ContentKind;
   titleSnapshot: string;
   bodySnapshot: string;
+  structuredSnapshot: string | null;
   editorIdentifier: string | null;
   createdAt: string;
 }
@@ -94,8 +96,27 @@ export interface PageRecord extends SeoFields {
   navigationLabel: string;
   showInNavigation: boolean;
   navigationOrder: number;
+  enabled: boolean;
+  requiredPageKey: RequiredPageKey | null;
+  showInFooter: boolean;
+  footerLabel: string;
+  footerOrder: number;
+  footerGroup: FooterGroup;
+  faqEntries: FaqEntryRecord[];
   publishedAt: string | null;
   revisions: ContentRevisionRecord[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FaqEntryRecord {
+  id: string;
+  pageId: string;
+  question: string;
+  answer: string;
+  category: string;
+  displayOrder: number;
+  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -182,7 +203,12 @@ export interface ContentWorkspace {
     affiliateUrl: string;
     imageUrl: string | null;
     priceText: string;
+    badge: string;
     shortDescription: string;
     componentType: ProductComponentType;
   }>;
+}
+
+export function getPagePublicPath(page: Pick<PageRecord, 'requiredPageKey' | 'slug'>) {
+  return page.requiredPageKey ? `/${page.requiredPageKey}` : `/pages/${page.slug}`;
 }

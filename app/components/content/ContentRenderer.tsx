@@ -7,8 +7,9 @@ import { EmailSignup } from '../EmailSignup';
 import { RecommendationProductCard } from '../RecommendationProductCard';
 import { ArticleMiddleAd, ArticleTopAd } from '../ads/AdPlacements';
 import type { AffiliateProductRecord } from '../../lib/affiliate-types';
-import { isRichTextBody } from '../../lib/rich-text-shared';
+import { hasInlineAffiliateLinks, isRichTextBody } from '../../lib/rich-text-shared';
 import { parseRichTextSegments } from '../../lib/rich-text';
+import { withFallbackImageAlt } from '../../lib/image-alt';
 
 type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
 type ImageBlock = { kind: 'image'; url: string; alt: string; caption: string; align: 'left' | 'center' | 'right' | 'full'; size: 'small' | 'medium' | 'large' | 'full'; link: string };
@@ -23,7 +24,7 @@ type Block =
   | ImageBlock
   | CustomBlock;
 
-export async function ContentRenderer({ body, articleAds = false }: { body: string; articleAds?: boolean }) {
+export async function ContentRenderer({ body, articleAds = false, imageAltFallback = 'Content image' }: { body: string; articleAds?: boolean; imageAltFallback?: string }) {
   const blocks = parseContent(body);
   const productIds = blocks.filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'affiliate').map((block) => block.argument).filter(Boolean);
   const [products, siteContent] = await Promise.all([
@@ -31,17 +32,18 @@ export async function ContentRenderer({ body, articleAds = false }: { body: stri
     getSiteContentMap(),
   ]);
   const productMap = new Map(products.map((product) => [product.id, product]));
-  const hasAffiliate = blocks.some((block) => isCustomBlock(block) && block.kind === 'affiliate' && productMap.has(block.argument));
+  const hasAffiliate = hasInlineAffiliateLinks(body)
+    || blocks.some((block) => isCustomBlock(block) && block.kind === 'affiliate' && productMap.has(block.argument));
   const articleTopAfter = articleAds && blocks.length > 0 ? Math.min(1, blocks.length - 1) : -1;
   const articleMiddleAfter = articleAds && blocks.length >= 6
     ? Math.min(blocks.length - 2, Math.max(articleTopAfter + 2, Math.floor(blocks.length / 2)))
     : -1;
 
   return (
-    <div className="content-renderer grid gap-5 text-base leading-8 text-slate-200">
+    <div className="content-renderer grid gap-4 text-base leading-7 text-slate-200">
       {blocks.map((block, index) => (
         <Fragment key={`content-block-${index}`}>
-          {renderBlock(block, index, productMap, siteContent)}
+          {renderBlock(block, index, productMap, siteContent, imageAltFallback)}
           {index === articleTopAfter ? <ArticleTopAd className="my-5 w-full" /> : null}
           {index === articleMiddleAfter ? <ArticleMiddleAd className="my-5 w-full" /> : null}
         </Fragment>
@@ -122,20 +124,20 @@ function moveEarlyMonetization(blocks: Block[]) {
   return [...blocks.slice(0, 2).filter((block) => !isMonetized(block)), ...blocks.slice(2), ...early];
 }
 
-function renderBlock(block: Block, index: number, products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>, siteContent: Record<string, string>) : ReactNode {
+function renderBlock(block: Block, index: number, products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>, siteContent: Record<string, string>, imageAltFallback: string) : ReactNode {
   const key = `${block.kind}-${index}`;
   if (block.kind === 'rich-html') {
     return (
       <div
-        className="cms-rich-content grid gap-5 [&_a]:font-bold [&_a]:text-violet-300 [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-5 [&_blockquote]:py-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-emerald-200 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-slate-500 [&_figure]:mx-auto [&_figure]:my-5 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-white [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:text-white [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-black [&_h3]:text-white [&_h4]:mt-4 [&_h4]:text-lg [&_h4]:font-black [&_h4]:text-white [&_hr]:border-white/10 [&_img]:max-h-[720px] [&_img]:w-full [&_img]:rounded-2xl [&_img]:object-contain [&_li]:ml-6 [&_ol]:list-decimal [&_ol]:space-y-2 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:border [&_pre]:border-white/10 [&_pre]:bg-black/50 [&_pre]:p-4 [&_pre_code]:bg-transparent [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:p-3 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:p-3 [&_ul]:list-disc [&_ul]:space-y-2"
-        dangerouslySetInnerHTML={{ __html: block.html }}
+        className="cms-rich-content grid gap-4 [&_a]:font-bold [&_a]:text-violet-300 [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2.5 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-black/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-emerald-200 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-slate-500 [&_figure]:mx-auto [&_figure]:my-4 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-black [&_h1]:text-white sm:[&_h1]:text-3xl [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-black [&_h2]:text-white sm:[&_h2]:text-2xl [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-black [&_h3]:text-white sm:[&_h3]:text-xl [&_h4]:mt-3 [&_h4]:text-base [&_h4]:font-black [&_h4]:text-white sm:[&_h4]:text-lg [&_hr]:border-white/10 [&_img]:max-h-[680px] [&_img]:w-full [&_img]:rounded-2xl [&_img]:object-contain [&_li]:ml-6 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:border [&_pre]:border-white/10 [&_pre]:bg-black/50 [&_pre]:p-4 [&_pre_code]:bg-transparent [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:p-2.5 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:p-2.5 [&_ul]:list-disc [&_ul]:space-y-1.5"
+        dangerouslySetInnerHTML={{ __html: withFallbackImageAlt(block.html, imageAltFallback) }}
         key={key}
       />
     );
   }
   if (block.kind === 'heading') {
     const Tag = `h${Math.min(6, Math.max(2, block.level + 1))}` as 'h2';
-    return <Tag className="mt-5 text-balance text-2xl font-black text-white" key={key}>{inline(block.text)}</Tag>;
+    return <Tag className="mt-4 text-balance text-xl font-black text-white sm:text-2xl" key={key}>{inline(block.text)}</Tag>;
   }
   if (block.kind === 'paragraph') return <p key={key}>{inline(block.text)}</p>;
   if (block.kind === 'quote') return <blockquote className="border-l-4 border-violet-400 bg-violet-500/10 px-5 py-3 italic text-slate-200" key={key}>{inline(block.text)}</blockquote>;
@@ -144,7 +146,7 @@ function renderBlock(block: Block, index: number, products: Map<string, Awaited<
   if (block.kind === 'list') { const Tag = block.ordered ? 'ol' : 'ul'; return <Tag className={`grid gap-2 pl-6 ${block.ordered ? 'list-decimal' : 'list-disc'}`} key={key}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{inline(item)}</li>)}</Tag>; }
   if (block.kind === 'table') return <div className="overflow-x-auto" key={key}><table className="w-full border-collapse text-left text-sm"><thead><tr>{block.rows[0]?.map((cell, cellIndex) => <th className="border border-white/10 bg-white/5 p-3" key={cellIndex}>{inline(cell)}</th>)}</tr></thead><tbody>{block.rows.slice(1).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td className="border border-white/10 p-3" key={cellIndex}>{inline(cell)}</td>)}</tr>)}</tbody></table></div>;
   if (block.kind === 'image') {
-    const image = <img alt={block.alt} className="max-h-[720px] w-full rounded-2xl object-contain" loading="lazy" referrerPolicy="no-referrer" src={block.url} />;
+    const image = <img alt={block.alt || imageAltFallback} className="max-h-[720px] w-full rounded-2xl object-contain" loading="lazy" referrerPolicy="no-referrer" src={block.url} />;
     return <figure className={`my-5 ${imageSizeClass(block.size)} ${imageAlignClass(block.align)}`} key={key}>{block.link && safeUrl(block.link, false) ? <a href={block.link} rel={block.link.startsWith('/') ? undefined : 'noopener noreferrer'}>{image}</a> : image}{block.caption ? <figcaption className="mt-2 text-center text-sm leading-6 text-slate-500">{block.caption}</figcaption> : null}</figure>;
   }
   if (block.kind === 'callout') return <aside className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-5 text-cyan-50" key={key}>{inline(block.text)}</aside>;
@@ -152,7 +154,7 @@ function renderBlock(block: Block, index: number, products: Map<string, Awaited<
   if (block.kind === 'email-signup') return <EmailSignup description={siteContent.email_signup_description} heading={siteContent.email_signup_heading} key={key} signupSource="article" variant="article" />;
   if (block.kind === 'checker') return <a className="inline-flex justify-center rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400" href="/" key={key}>{block.text || 'Check whether your PC can run GTA VI'}</a>;
   if (block.kind === 'ad') return <div aria-label="Advertisement" className="min-h-20 rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-slate-600" data-ad-slot={block.argument} key={key}>Advertisement</div>;
-  if (block.kind === 'affiliate') { const product = products.get(block.argument); return product ? <div className="max-w-xl" key={key}><RecommendationProductCard product={toAffiliateProduct(product)} /></div> : null; }
+  if (block.kind === 'affiliate') { const product = products.get(block.argument); return product ? <div className="max-w-xl" key={key}><RecommendationProductCard headingLevel="h2" product={toAffiliateProduct(product)} /></div> : null; }
   return null;
 }
 

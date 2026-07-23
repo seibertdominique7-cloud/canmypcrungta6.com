@@ -7,6 +7,16 @@ import {
   type PageTemplate,
   type SeoFields,
 } from './cms-types';
+import { FOOTER_GROUPS, type FooterGroup } from '../data/required-pages';
+
+export interface FaqEntryInput {
+  id: string | null;
+  question: string;
+  answer: string;
+  category: string;
+  displayOrder: number;
+  enabled: boolean;
+}
 
 export interface ArticleInput extends SeoFields {
   title: string;
@@ -37,6 +47,12 @@ export interface PageInput extends SeoFields {
   navigationLabel: string;
   showInNavigation: boolean;
   navigationOrder: number;
+  enabled: boolean;
+  showInFooter: boolean;
+  footerLabel: string;
+  footerOrder: number;
+  footerGroup: FooterGroup;
+  faqEntries: FaqEntryInput[];
   publishedAt: Date | null;
 }
 
@@ -99,10 +115,13 @@ export function validatePageInput(value: unknown): ValidationResult<PageInput> {
   const slug = createSlug(text(input.slug || input.title, 120));
   const status = text(input.status, 20) as ContentStatus;
   const pageTemplate = text(input.pageTemplate, 40) as PageTemplate;
+  const footerGroup = text(input.footerGroup, 40) as FooterGroup;
   if (!title) fieldErrors.title = 'Title is required.';
   if (!slug) fieldErrors.slug = 'Slug is required.';
   if (!CONTENT_STATUSES.includes(status) || status === 'scheduled') fieldErrors.status = 'Choose draft, published, or archived for a page.';
   if (!PAGE_TEMPLATES.includes(pageTemplate)) fieldErrors.pageTemplate = 'Choose a valid page template.';
+  if (!FOOTER_GROUPS.includes(footerGroup)) fieldErrors.footerGroup = 'Choose a valid footer group.';
+  const faqEntries = validateFaqEntries(input.faqEntries, fieldErrors);
   const seo = validateSeo(input, fieldErrors);
   return {
     data: Object.keys(fieldErrors).length ? null : {
@@ -113,12 +132,37 @@ export function validatePageInput(value: unknown): ValidationResult<PageInput> {
       navigationLabel: text(input.navigationLabel, 100, false),
       showInNavigation: bool(input.showInNavigation),
       navigationOrder: integer(input.navigationOrder, 0, 100000),
+      enabled: bool(input.enabled, true),
+      showInFooter: bool(input.showInFooter),
+      footerLabel: text(input.footerLabel, 100, false),
+      footerOrder: integer(input.footerOrder, 0, 100000),
+      footerGroup,
+      faqEntries,
       publishedAt: dateValue(input.publishedAt),
       ...seo,
     },
     fieldErrors,
     warnings: seoWarnings(seo),
   };
+}
+
+function validateFaqEntries(value: unknown, fieldErrors: Record<string, string>): FaqEntryInput[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).map((item, index) => {
+    const entry = record(item);
+    const question = text(entry.question, 300);
+    const answer = text(entry.answer, 5000);
+    if (!question) fieldErrors[`faqEntries.${index}.question`] = 'Question is required.';
+    if (!answer) fieldErrors[`faqEntries.${index}.answer`] = 'Answer is required.';
+    return {
+      id: text(entry.id, 100, false) || null,
+      question,
+      answer,
+      category: text(entry.category, 80) || 'General',
+      displayOrder: integer(entry.displayOrder, 0, 100000),
+      enabled: bool(entry.enabled, true),
+    };
+  });
 }
 
 export function validatePath(value: unknown, label: string) {

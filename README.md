@@ -42,6 +42,20 @@ $bytes = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Cr
 Keep `.env.local` private. It is ignored by Git and must never be exposed through
 `NEXT_PUBLIC_` environment variables.
 
+## Brevo newsletter setup
+
+Newsletter signups are committed to the local subscriber database first and then added or updated
+in Brevo. Configure these private server environment variables in `.env.local`:
+
+- `BREVO_API_KEY`
+- `BREVO_LIST_ID`
+- `BREVO_SENDER_EMAIL`
+- `BREVO_SENDER_NAME`
+
+Do not prefix the API key with `NEXT_PUBLIC_`. If Brevo is unavailable or incomplete, the local
+subscription remains saved and the server logs a safe diagnostic without the email address or API
+key. Add the same variables to the Vercel project and redeploy after changing them in production.
+
 ## Content management
 
 The private admin includes Articles, Pages, Categories, Tags, Media, Site Content, and Redirects.

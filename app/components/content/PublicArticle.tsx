@@ -44,7 +44,7 @@ export async function PublicArticle({
     : null;
 
   return (
-    <main className="public-theme min-h-screen px-4 py-10 text-slate-100 sm:px-6">
+    <main className="public-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6 sm:py-9">
       <article className="mx-auto max-w-4xl">
         {preview ? (
           <p className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm font-bold text-amber-200">
@@ -62,15 +62,15 @@ export async function PublicArticle({
             </>
           ) : null}
         </nav>
-        <header className="mt-6">
+        <header className="mt-5">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-300">
             {article.contentType.replace(/-/g, ' ')}
           </p>
-          <h1 className="mt-3 text-balance text-4xl font-black leading-tight sm:text-6xl">
+          <h1 className="mt-3 text-balance text-4xl font-black leading-[1.08] sm:text-5xl">
             {article.title}
           </h1>
-          <p className="mt-5 text-xl leading-8 text-slate-300">{article.excerpt}</p>
-          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
+          <p className="mt-4 text-lg leading-7 text-slate-300">{article.excerpt}</p>
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
             <span>By {article.authorName}</span>
             <time dateTime={publishedDate}>Published {formatDate(publishedDate)}</time>
             <time dateTime={article.updatedAt}>Updated {formatDate(article.updatedAt)}</time>
@@ -92,17 +92,17 @@ export async function PublicArticle({
         </header>
         {article.featuredImage ? (
           <img
-            alt=""
-            className="mt-8 max-h-[600px] w-full rounded-3xl bg-black/20 object-contain"
+            alt={`${article.title} featured image`}
+            className="mt-6 max-h-[540px] w-full rounded-3xl bg-black/20 object-contain"
             referrerPolicy="no-referrer"
             src={article.featuredImage}
           />
         ) : null}
-        <div className="mt-10">
-          <ContentRenderer articleAds body={article.body} />
+        <div className="mt-8">
+          <ContentRenderer articleAds body={article.body} imageAltFallback={article.title} />
         </div>
         <a
-          className="mt-10 inline-flex rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400"
+          className="mt-8 inline-flex rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400"
           href="/"
         >
           Check whether your PC can run GTA VI

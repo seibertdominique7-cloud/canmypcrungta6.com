@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { publicPageMetadata } from '../lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: 'Affiliate Disclosure | GTA VI PC Checker',
   description: 'How affiliate links and estimated performance recommendations are used on this site.',
-};
+  path: '/affiliate-disclosure',
+});
 
 export default function AffiliateDisclosurePage() {
   return (

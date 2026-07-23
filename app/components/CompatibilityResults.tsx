@@ -3,6 +3,7 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 import { AffiliateRecommendations } from './AffiliateRecommendations';
+import { CreatorRecommendations } from './CreatorRecommendations';
 import { EmailSignup } from './EmailSignup';
 import {
   getRequirementDisclaimer,
@@ -193,6 +194,8 @@ export function CompatibilityResults({
       </div>
 
       <AffiliateRecommendations result={result} />
+
+      <CreatorRecommendations result={result} />
 
       <EmailSignup
         scenario={determineRecommendationScenario(result)}

@@ -22,6 +22,11 @@ import { createSlug, validatePath } from './cms-validation';
 import { AdminDataError } from './admin-data-error';
 import { validateExternalImageUrl } from './media-validation';
 import { prisma } from './prisma';
+import {
+  REQUIRED_PAGES,
+  isRequiredPageKey,
+  type RequiredPageKey,
+} from '../data/required-pages';
 
 const articleInclude = {
   categories: { include: { category: { include: { _count: { select: { articles: true } } } } } },
@@ -34,11 +39,15 @@ type CategoryWithCount = Prisma.ContentCategoryGetPayload<{ include: { _count: {
 type TagWithCount = Prisma.ContentTagGetPayload<{ include: { _count: { select: { articles: true } } } }>;
 type MediaWithFolder = Prisma.MediaAssetGetPayload<{ include: { folder: true } }>;
 type MediaFolderWithCount = Prisma.MediaFolderGetPayload<{ include: { _count: { select: { media: true } } } }>;
+const pageInclude = {
+  faqEntries: { orderBy: [{ displayOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
+} satisfies Prisma.ContentPageInclude;
+type PageWithFaqs = Prisma.ContentPageGetPayload<{ include: typeof pageInclude }>;
 
 export async function getContentWorkspace(): Promise<ContentWorkspace> {
   const [articles, pages, categories, tags, media, mediaFolders, affiliateProducts, revisions] = await Promise.all([
     prisma.article.findMany({ orderBy: { updatedAt: 'desc' }, include: articleInclude }),
-    prisma.contentPage.findMany({ orderBy: { updatedAt: 'desc' } }),
+    prisma.contentPage.findMany({ orderBy: { updatedAt: 'desc' }, include: pageInclude }),
     prisma.contentCategory.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { articles: true } } } }),
     prisma.contentTag.findMany({ orderBy: { name: 'asc' }, include: { _count: { select: { articles: true } } } }),
     prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' }, include: { folder: true } }),
@@ -55,6 +64,12 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
         defaultPriceText: true,
         shortDescription: true,
         componentType: true,
+        assignments: {
+          where: { enabled: true },
+          orderBy: { displayOrder: 'asc' },
+          select: { badge: true },
+          take: 1,
+        },
       },
     }),
     prisma.contentRevision.findMany({ orderBy: { createdAt: 'desc' } }),
@@ -66,11 +81,12 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
     tags: tags.map(serializeTag),
     media: await Promise.all(media.map(serializeMedia)),
     mediaFolders: mediaFolders.map(serializeMediaFolder),
-    affiliateProducts: affiliateProducts.map(({ defaultPriceText, ...product }) => ({
+    affiliateProducts: affiliateProducts.map(({ defaultPriceText, assignments, ...product }) => ({
       ...product,
       retailer: product.retailer as AffiliateRetailer,
       componentType: product.componentType as ProductComponentType,
       priceText: defaultPriceText,
+      badge: assignments[0]?.badge ?? 'None',
     })),
   };
 }
@@ -148,31 +164,61 @@ export async function deleteArticle(id: string) {
 
 export async function createPage(input: PageInput) {
   await ensureUniqueSlug('page', input.slug);
-  return prisma.contentPage.create({ data: pageFields(input, input.status === 'published' ? input.publishedAt ?? new Date() : input.publishedAt) });
+  return prisma.contentPage.create({
+    data: {
+      ...pageFields(input, input.status === 'published' ? input.publishedAt ?? new Date() : input.publishedAt),
+      faqEntries: { create: faqEntryFields(input.faqEntries) },
+    },
+  });
 }
 
 export async function updatePage(id: string, input: PageInput) {
-  const existing = await prisma.contentPage.findUnique({ where: { id } });
+  const existing = await prisma.contentPage.findUnique({ where: { id }, include: pageInclude });
   if (!existing) throw new AdminDataError('Page not found.', 404);
+  if (existing.requiredPageKey && existing.slug !== input.slug) {
+    throw new AdminDataError('The slug for a required public page is fixed so its public URL remains stable.', 409);
+  }
   await ensureUniqueSlug('page', input.slug, id);
   const slugChanged = existing.slug !== input.slug;
   if (slugChanged && isEverPublished(existing.status, existing.publishedAt)) await assertRedirectSafe(`/pages/${existing.slug}`, `/pages/${input.slug}`);
   const publishedAt = input.status === 'published' ? input.publishedAt ?? existing.publishedAt ?? new Date() : input.publishedAt ?? existing.publishedAt;
   await prisma.$transaction(async (transaction) => {
-    if (existing.title !== input.title || existing.body !== input.body) await transaction.contentRevision.create({ data: { contentId: id, contentKind: 'page', titleSnapshot: existing.title, bodySnapshot: existing.body, editorIdentifier: 'admin' } });
-    await transaction.contentPage.update({ where: { id }, data: pageFields(input, publishedAt) });
+    if (existing.title !== input.title || existing.body !== input.body || faqSnapshot(existing.faqEntries) !== faqSnapshot(input.faqEntries)) await transaction.contentRevision.create({ data: { contentId: id, contentKind: 'page', titleSnapshot: existing.title, bodySnapshot: existing.body, structuredSnapshot: faqSnapshot(existing.faqEntries), editorIdentifier: 'admin' } });
+    await transaction.faqEntry.deleteMany({ where: { pageId: id } });
+    await transaction.contentPage.update({
+      where: { id },
+      data: {
+        ...pageFields(input, publishedAt),
+        faqEntries: { create: faqEntryFields(input.faqEntries) },
+      },
+    });
     if (slugChanged && isEverPublished(existing.status, existing.publishedAt)) await transaction.redirect.upsert({ where: { sourcePath: `/pages/${existing.slug}` }, update: { destinationPath: `/pages/${input.slug}`, statusCode: 301, enabled: true }, create: { sourcePath: `/pages/${existing.slug}`, destinationPath: `/pages/${input.slug}`, statusCode: 301, enabled: true } });
   });
   await trimRevisions('page', id);
 }
 
 export async function duplicatePage(id: string) {
-  const source = await prisma.contentPage.findUnique({ where: { id } });
+  const source = await prisma.contentPage.findUnique({ where: { id }, include: pageInclude });
   if (!source) throw new AdminDataError('Page not found.', 404);
-  return prisma.contentPage.create({ data: { ...pageFields(toPageInput(source), null), title: `${source.title} Copy`, slug: await availableSlug('page', `${source.slug}-copy`), status: 'draft', publishedAt: null, showInNavigation: false } });
+  return prisma.contentPage.create({
+    data: {
+      ...pageFields(toPageInput(source), null),
+      title: `${source.title} Copy`,
+      slug: await availableSlug('page', `${source.slug}-copy`),
+      status: 'draft',
+      publishedAt: null,
+      showInNavigation: false,
+      showInFooter: false,
+      requiredPageKey: null,
+      faqEntries: { create: faqEntryFields(toPageInput(source).faqEntries) },
+    },
+  });
 }
 
 export async function deletePage(id: string) {
+  const page = await prisma.contentPage.findUnique({ where: { id }, select: { requiredPageKey: true } });
+  if (!page) throw new AdminDataError('Page not found.', 404);
+  if (page.requiredPageKey) throw new AdminDataError('Required public pages cannot be deleted. Disable or unpublish the page instead.', 409);
   await prisma.$transaction([prisma.contentRevision.deleteMany({ where: { contentKind: 'page', contentId: id } }), prisma.contentPage.delete({ where: { id } })]);
 }
 
@@ -184,9 +230,14 @@ export async function restoreRevision(kind: 'article' | 'page', contentId: strin
     if (!current) throw new AdminDataError('Article not found.', 404);
     await prisma.$transaction([prisma.contentRevision.create({ data: { contentId, contentKind: kind, titleSnapshot: current.title, bodySnapshot: current.body, editorIdentifier: 'admin-before-restore' } }), prisma.article.update({ where: { id: contentId }, data: { title: revision.titleSnapshot, body: revision.bodySnapshot } })]);
   } else {
-    const current = await prisma.contentPage.findUnique({ where: { id: contentId } });
+    const current = await prisma.contentPage.findUnique({ where: { id: contentId }, include: pageInclude });
     if (!current) throw new AdminDataError('Page not found.', 404);
-    await prisma.$transaction([prisma.contentRevision.create({ data: { contentId, contentKind: kind, titleSnapshot: current.title, bodySnapshot: current.body, editorIdentifier: 'admin-before-restore' } }), prisma.contentPage.update({ where: { id: contentId }, data: { title: revision.titleSnapshot, body: revision.bodySnapshot } })]);
+    const restoredFaqs = parseFaqSnapshot(revision.structuredSnapshot);
+    await prisma.$transaction(async (transaction) => {
+      await transaction.contentRevision.create({ data: { contentId, contentKind: kind, titleSnapshot: current.title, bodySnapshot: current.body, structuredSnapshot: faqSnapshot(current.faqEntries), editorIdentifier: 'admin-before-restore' } });
+      if (restoredFaqs) await transaction.faqEntry.deleteMany({ where: { pageId: contentId } });
+      await transaction.contentPage.update({ where: { id: contentId }, data: { title: revision.titleSnapshot, body: revision.bodySnapshot, ...(restoredFaqs ? { faqEntries: { create: faqEntryFields(restoredFaqs) } } : {}) } });
+    });
   }
   await trimRevisions(kind, contentId);
 }
@@ -339,7 +390,16 @@ export async function getPublishedArticleBySlug(slug: string) {
 }
 
 export async function getPublishedPageBySlug(slug: string) {
-  const page = await prisma.contentPage.findFirst({ where: { slug, status: 'published' } });
+  const page = await prisma.contentPage.findFirst({ where: { slug, status: 'published', enabled: true }, include: pageInclude });
+  return page ? serializePage(page) : null;
+}
+
+export async function getPublishedRequiredPage(key: string) {
+  if (!isRequiredPageKey(key)) return null;
+  const page = await prisma.contentPage.findFirst({
+    where: { requiredPageKey: key, status: 'published', enabled: true },
+    include: { faqEntries: { where: { enabled: true }, orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }] } },
+  });
   return page ? serializePage(page) : null;
 }
 
@@ -349,7 +409,7 @@ export async function getArticlePreview(id: string) {
 }
 
 export async function getPagePreview(id: string) {
-  const [page, revisions] = await Promise.all([prisma.contentPage.findUnique({ where: { id } }), prisma.contentRevision.findMany({ where: { contentKind: 'page', contentId: id }, orderBy: { createdAt: 'desc' }, take: 20 })]);
+  const [page, revisions] = await Promise.all([prisma.contentPage.findUnique({ where: { id }, include: pageInclude }), prisma.contentRevision.findMany({ where: { contentKind: 'page', contentId: id }, orderBy: { createdAt: 'desc' }, take: 20 })]);
   return page ? serializePage(page, revisions) : null;
 }
 
@@ -394,7 +454,83 @@ export async function getHomepageArticles(limit = 3) {
 }
 
 export async function getNavigationPages() {
-  return prisma.contentPage.findMany({ where: { status: 'published', showInNavigation: true }, orderBy: [{ navigationOrder: 'asc' }, { title: 'asc' }], select: { slug: true, title: true, navigationLabel: true } });
+  return prisma.contentPage.findMany({ where: { status: 'published', enabled: true, showInNavigation: true }, orderBy: [{ navigationOrder: 'asc' }, { title: 'asc' }], select: { slug: true, title: true, navigationLabel: true, requiredPageKey: true } });
+}
+
+export async function getFooterPages() {
+  return prisma.contentPage.findMany({
+    where: { status: 'published', enabled: true, showInFooter: true },
+    orderBy: [{ footerGroup: 'asc' }, { footerOrder: 'asc' }, { title: 'asc' }],
+    select: { slug: true, title: true, requiredPageKey: true, footerLabel: true, footerGroup: true, footerOrder: true },
+  });
+}
+
+export async function restoreMissingRequiredPages() {
+  let created = 0;
+  let linked = 0;
+
+  for (const definition of REQUIRED_PAGES) {
+    const keyed = await prisma.contentPage.findUnique({
+      where: { requiredPageKey: definition.key },
+      select: { id: true },
+    });
+    if (keyed) continue;
+
+    const equivalent = await prisma.contentPage.findFirst({
+      where: {
+        OR: [
+          { slug: { in: definition.aliases } },
+          { title: definition.title },
+        ],
+      },
+      include: { faqEntries: { select: { id: true } } },
+    });
+
+    if (equivalent) {
+      await prisma.contentPage.update({
+        where: { id: equivalent.id },
+        data: {
+          requiredPageKey: definition.key,
+          ...(definition.faqEntries?.length && !equivalent.faqEntries.length
+            ? {
+                faqEntries: {
+                  create: definition.faqEntries.map((entry) => ({ ...entry, enabled: true })),
+                },
+              }
+            : {}),
+        },
+      });
+      linked += 1;
+      continue;
+    }
+
+    await prisma.contentPage.create({
+      data: {
+        title: definition.title,
+        slug: definition.key,
+        excerpt: definition.excerpt,
+        body: definition.body,
+        status: 'published',
+        enabled: true,
+        requiredPageKey: definition.key,
+        pageTemplate: definition.pageTemplate,
+        publishedAt: new Date(),
+        seoTitle: definition.seoTitle,
+        metaDescription: definition.metaDescription,
+        schemaType: definition.schemaType,
+        showInFooter: true,
+        footerLabel: definition.footerLabel,
+        footerGroup: definition.footerGroup,
+        footerOrder: definition.footerOrder,
+        faqEntries: definition.faqEntries?.length
+          ? { create: definition.faqEntries.map((entry) => ({ ...entry, enabled: true })) }
+          : undefined,
+      },
+    });
+    created += 1;
+  }
+
+  return { created, linked };
 }
 
 export async function getMediaAssets(): Promise<MediaAssetRecord[]> {
@@ -492,7 +628,7 @@ export async function getIndexableContent() {
   const now = new Date();
   const [articles, pages, categories, tags] = await Promise.all([
     prisma.article.findMany({ where: { ...publicArticleWhere(now), noindex: false, robotsIndex: true }, select: { slug: true, updatedAt: true, featuredImage: true } }),
-    prisma.contentPage.findMany({ where: { status: 'published', noindex: false, robotsIndex: true }, select: { slug: true, updatedAt: true, featuredImage: true } }),
+    prisma.contentPage.findMany({ where: { status: 'published', enabled: true, noindex: false, robotsIndex: true }, select: { slug: true, requiredPageKey: true, updatedAt: true, featuredImage: true } }),
     prisma.contentCategory.findMany({ where: { articles: { some: { article: publicArticleWhere(now) } } }, select: { slug: true, updatedAt: true } }),
     prisma.contentTag.findMany({ where: { articles: { some: { article: publicArticleWhere(now) } } }, select: { slug: true, updatedAt: true } }),
   ]);
@@ -555,6 +691,11 @@ function pageFields(input: PageInput, publishedAt: Date | null) {
     navigationLabel: input.navigationLabel,
     showInNavigation: input.showInNavigation,
     navigationOrder: input.navigationOrder,
+    enabled: input.enabled,
+    showInFooter: input.showInFooter,
+    footerLabel: input.footerLabel,
+    footerOrder: input.footerOrder,
+    footerGroup: input.footerGroup,
     publishedAt,
     seoTitle: input.seoTitle,
     metaDescription: input.metaDescription,
@@ -571,6 +712,41 @@ function pageFields(input: PageInput, publishedAt: Date | null) {
     schemaType: input.schemaType,
     noindex: input.noindex,
   };
+}
+
+function faqEntryFields(entries: PageInput['faqEntries']) {
+  return entries.map((entry) => ({
+    question: entry.question,
+    answer: entry.answer,
+    category: entry.category,
+    displayOrder: entry.displayOrder,
+    enabled: entry.enabled,
+  }));
+}
+
+function faqSnapshot(entries: Array<{ question: string; answer: string; category: string; displayOrder: number; enabled: boolean }>) {
+  return JSON.stringify(entries.map(({ question, answer, category, displayOrder, enabled }) => ({ question, answer, category, displayOrder, enabled })));
+}
+
+function parseFaqSnapshot(value: string | null): PageInput['faqEntries'] | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((item, index) => {
+      const entry = typeof item === 'object' && item !== null ? item as Record<string, unknown> : {};
+      return {
+        id: null,
+        question: typeof entry.question === 'string' ? entry.question : '',
+        answer: typeof entry.answer === 'string' ? entry.answer : '',
+        category: typeof entry.category === 'string' ? entry.category : 'General',
+        displayOrder: typeof entry.displayOrder === 'number' ? entry.displayOrder : (index + 1) * 10,
+        enabled: entry.enabled !== false,
+      };
+    }).filter((entry) => entry.question && entry.answer);
+  } catch {
+    return null;
+  }
 }
 
 function publicArticleWhere(now: Date): Prisma.ArticleWhereInput {
@@ -671,8 +847,23 @@ function serializeArticle(article: ArticleWithRelations, revisions: Prisma.Conte
   };
 }
 
-function serializePage(page: Prisma.ContentPageGetPayload<Record<string, never>>, revisions: Prisma.ContentRevisionGetPayload<Record<string, never>>[] = []): PageRecord {
-  return { ...page, status: page.status as PageRecord['status'], pageTemplate: page.pageTemplate as PageRecord['pageTemplate'], revisions: revisions.map(serializeRevision), publishedAt: page.publishedAt?.toISOString() ?? null, createdAt: page.createdAt.toISOString(), updatedAt: page.updatedAt.toISOString() };
+function serializePage(page: PageWithFaqs, revisions: Prisma.ContentRevisionGetPayload<Record<string, never>>[] = []): PageRecord {
+  return {
+    ...page,
+    status: page.status as PageRecord['status'],
+    pageTemplate: page.pageTemplate as PageRecord['pageTemplate'],
+    requiredPageKey: isRequiredPageKey(page.requiredPageKey ?? '') ? page.requiredPageKey as RequiredPageKey : null,
+    footerGroup: page.footerGroup as PageRecord['footerGroup'],
+    faqEntries: page.faqEntries.map((entry) => ({
+      ...entry,
+      createdAt: entry.createdAt.toISOString(),
+      updatedAt: entry.updatedAt.toISOString(),
+    })),
+    revisions: revisions.map(serializeRevision),
+    publishedAt: page.publishedAt?.toISOString() ?? null,
+    createdAt: page.createdAt.toISOString(),
+    updatedAt: page.updatedAt.toISOString(),
+  };
 }
 
 function serializeCategory(category: CategoryWithCount): ContentCategoryRecord {
@@ -697,6 +888,12 @@ function toArticleInput(source: ArticleWithRelations): ArticleInput {
   return { ...source, status: source.status as ArticleInput['status'], contentType: source.contentType as ArticleInput['contentType'], categoryIds: source.categories.map((item) => item.categoryId), primaryCategoryId: source.categories.find((item) => item.isPrimary)?.categoryId ?? null, tagIds: source.tags.map((item) => item.tagId), relatedArticleIds: source.relatedArticles.map((item) => item.relatedArticleId) };
 }
 
-function toPageInput(source: Prisma.ContentPageGetPayload<Record<string, never>>): PageInput {
-  return { ...source, status: source.status as PageInput['status'], pageTemplate: source.pageTemplate as PageInput['pageTemplate'] };
+function toPageInput(source: PageWithFaqs): PageInput {
+  return {
+    ...source,
+    status: source.status as PageInput['status'],
+    pageTemplate: source.pageTemplate as PageInput['pageTemplate'],
+    footerGroup: source.footerGroup as PageInput['footerGroup'],
+    faqEntries: source.faqEntries.map((entry) => ({ ...entry, id: entry.id })),
+  };
 }

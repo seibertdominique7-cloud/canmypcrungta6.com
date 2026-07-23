@@ -104,12 +104,14 @@ export async function getPublicMonetization(
   });
 
   if (!scenario) {
-    console.info(`[recommendations] Detected scenario: ${code}`, {
-      databaseScenarioCode: null,
-      sectionsFound: 0,
-      productsFound: 0,
-      reason: 'No exact database scenario match.',
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.info(`[recommendations] Detected scenario: ${code}`, {
+        databaseScenarioCode: null,
+        sectionsFound: 0,
+        productsFound: 0,
+        reason: 'No exact database scenario match.',
+      });
+    }
     return null;
   }
 
@@ -181,7 +183,9 @@ export async function getPublicMonetization(
     productsRejectedByUrl,
   };
 
-  console.info(`[recommendations] Detected scenario: ${code}`, debug);
+  if (process.env.NODE_ENV !== 'production') {
+    console.info(`[recommendations] Detected scenario: ${code}`, debug);
+  }
 
   return {
     scenario: {

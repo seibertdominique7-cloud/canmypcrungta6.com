@@ -3,6 +3,10 @@ export const AFFILIATE_RETAILERS = [
   'Best Buy',
   'Newegg',
   'Walmart',
+  'Target',
+  'eBay',
+  'Micro Center',
+  'B&H',
   'Other',
 ] as const;
 

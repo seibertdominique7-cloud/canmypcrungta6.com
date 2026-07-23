@@ -1,9 +1,9 @@
 import sanitizeHtml from 'sanitize-html';
 
-import { isRichTextBody, richTextBody, richTextHtml } from './rich-text-shared';
+import { AFFILIATE_LINK_REL, isRichTextBody, richTextBody, richTextHtml } from './rich-text-shared';
 
 const allowedTags = [
-  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'h1', 'h2', 'h3', 'h4',
+  'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'small', 'h1', 'h2', 'h3', 'h4',
   'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'table', 'thead', 'tbody',
   'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'div', 'span', 'cms-affiliate', 'cms-block',
 ];
@@ -12,7 +12,8 @@ export function sanitizeRichTextHtml(html: string) {
   return sanitizeHtml(html, {
     allowedTags,
     allowedAttributes: {
-      a: ['href', 'title', 'target', 'rel'],
+      '*': ['data-align', 'data-text-size'],
+      a: ['href', 'title', 'target', 'rel', 'data-link-kind', 'data-affiliate-product-id'],
       img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
       figure: ['data-cms-image', 'data-align', 'data-size', 'contenteditable'],
       table: ['summary'], th: ['colspan', 'rowspan', 'scope'], td: ['colspan', 'rowspan'],
@@ -23,12 +24,24 @@ export function sanitizeRichTextHtml(html: string) {
     allowProtocolRelative: false,
     transformTags: {
       a: (_tagName, attributes) => {
-        const external = /^https?:\/\//i.test(attributes.href ?? '');
-        return { tagName: 'a', attribs: external ? { ...attributes, target: '_blank', rel: 'noopener noreferrer' } : attributes };
+        const affiliate = attributes['data-link-kind'] === 'affiliate' && /^https?:\/\//i.test(attributes.href ?? '');
+        const target = attributes.target === '_blank' ? '_blank' : undefined;
+        const rel = affiliate ? AFFILIATE_LINK_REL : normalizeRel(attributes.rel, Boolean(target));
+        const attribs = { ...attributes };
+        if (target) attribs.target = target; else delete attribs.target;
+        if (rel) attribs.rel = rel; else delete attribs.rel;
+        return { tagName: 'a', attribs };
       },
       img: (_tagName, attributes) => ({ tagName: 'img', attribs: { ...attributes, loading: 'lazy' } }),
     },
   });
+}
+
+function normalizeRel(value: string | undefined, opensNewTab: boolean) {
+  const allowed = new Set(['sponsored', 'nofollow', 'noopener', 'noreferrer']);
+  const tokens = (value ?? '').toLowerCase().split(/\s+/).filter((token) => allowed.has(token));
+  if (opensNewTab && !tokens.includes('noopener')) tokens.push('noopener');
+  return Array.from(new Set(tokens)).join(' ');
 }
 
 export function sanitizeRichTextBody(body: string) {

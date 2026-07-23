@@ -9,6 +9,8 @@ import {
   getDefaultSectionId,
 } from '../app/data/recommendation-sections';
 import { DEFAULT_AD_PLACEMENTS } from '../app/data/ad-placements';
+import { REQUIRED_PAGES } from '../app/data/required-pages';
+import { CREATOR_SCENARIO_DEFAULTS } from '../app/data/creator-recommendations';
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL ?? 'file:./dev.db',
@@ -267,6 +269,8 @@ async function main() {
   });
   const scenarioIds = new Map(scenarios.map((scenario) => [scenario.code, scenario.id]));
 
+  await seedCreatorRecommendations(scenarioIds);
+
   let defaultSectionCount = 0;
 
   for (const [scenarioCode, sections] of Object.entries(
@@ -402,6 +406,31 @@ async function main() {
   );
 }
 
+async function seedCreatorRecommendations(scenarioIds: Map<string, string>) {
+  const existingCount = await prisma.creatorRecommendation.count();
+  if (existingCount > 0) return;
+
+  for (const [scenarioCode, copy] of Object.entries(CREATOR_SCENARIO_DEFAULTS)) {
+    const scenarioId = scenarioIds.get(scenarioCode);
+    if (!scenarioId) continue;
+
+    await prisma.creatorRecommendation.create({
+      data: {
+        scenarioId,
+        enabled: false,
+        headline: copy.headline,
+        subheadline: copy.subheadline,
+        description: copy.description,
+        warningText: copy.warningText,
+        primaryCtaLabel: copy.primaryCtaLabel,
+        primaryCtaUrl: copy.primaryCtaUrl,
+        secondaryCtaLabel: copy.secondaryCtaLabel,
+        secondaryCtaUrl: copy.secondaryCtaUrl,
+      },
+    });
+  }
+}
+
 async function seedAdManagement() {
   await prisma.adGlobalSettings.upsert({
     where: { id: 'global' },
@@ -470,6 +499,8 @@ async function seedContentManagement() {
     });
   }
 
+  await seedRequiredPages();
+
   if (await prisma.article.count()) return;
 
   const samples = [
@@ -495,6 +526,67 @@ async function seedContentManagement() {
           ? { create: { categoryId: category.id, isPrimary: true } }
           : undefined,
         createdAt: new Date(Date.now() + index),
+      },
+    });
+  }
+}
+
+async function seedRequiredPages() {
+  for (const definition of REQUIRED_PAGES) {
+    const keyed = await prisma.contentPage.findUnique({
+      where: { requiredPageKey: definition.key },
+      select: { id: true },
+    });
+    if (keyed) continue;
+
+    const equivalent = await prisma.contentPage.findFirst({
+      where: {
+        OR: [
+          { slug: { in: definition.aliases } },
+          { title: definition.title },
+        ],
+      },
+      include: { faqEntries: { select: { id: true } } },
+    });
+
+    if (equivalent) {
+      await prisma.contentPage.update({
+        where: { id: equivalent.id },
+        data: {
+          requiredPageKey: definition.key,
+          ...(definition.faqEntries?.length && !equivalent.faqEntries.length
+            ? {
+                faqEntries: {
+                  create: definition.faqEntries.map((entry) => ({ ...entry, enabled: true })),
+                },
+              }
+            : {}),
+        },
+      });
+      continue;
+    }
+
+    await prisma.contentPage.create({
+      data: {
+        title: definition.title,
+        slug: definition.key,
+        excerpt: definition.excerpt,
+        body: definition.body,
+        status: 'published',
+        enabled: true,
+        requiredPageKey: definition.key,
+        pageTemplate: definition.pageTemplate,
+        publishedAt: new Date(),
+        seoTitle: definition.seoTitle,
+        metaDescription: definition.metaDescription,
+        schemaType: definition.schemaType,
+        showInFooter: true,
+        footerLabel: definition.footerLabel,
+        footerGroup: definition.footerGroup,
+        footerOrder: definition.footerOrder,
+        faqEntries: definition.faqEntries?.length
+          ? { create: definition.faqEntries.map((entry) => ({ ...entry, enabled: true })) }
+          : undefined,
       },
     });
   }

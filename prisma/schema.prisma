@@ -19,6 +19,7 @@ model RecommendationScenario {
   groupType            String                  @default("SCENARIO")
   sections             RecommendationSection[]
   legacyAffiliateLinks LegacyAffiliateLink[]
+  creatorRecommendation CreatorRecommendation?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
@@ -59,6 +60,7 @@ model Product {
   platform            String?
   enabled             Boolean                    @default(true)
   assignments         RecommendationAssignment[]
+  creatorAssignments  CreatorProductAssignment[]
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
@@ -84,6 +86,72 @@ model RecommendationAssignment {
 
   @@index([sectionId, enabled, displayOrder])
   @@index([productId, enabled])
+}
+
+model CreatorRecommendation {
+  id                String                         @id @default(cuid())
+  scenarioId        String                         @unique
+  scenario          RecommendationScenario         @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  enabled           Boolean                        @default(false)
+  headline          String
+  subheadline       String
+  description       String
+  warningText       String                         @default("")
+  primaryCtaLabel   String
+  primaryCtaUrl     String
+  secondaryCtaLabel String                         @default("")
+  secondaryCtaUrl   String                         @default("")
+  groups            CreatorRecommendationGroup[]
+  guides            CreatorGuideLink[]
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  @@index([enabled, updatedAt])
+}
+
+model CreatorRecommendationGroup {
+  id                      String                     @id @default(cuid())
+  creatorRecommendationId String
+  creatorRecommendation   CreatorRecommendation      @relation(fields: [creatorRecommendationId], references: [id], onDelete: Cascade)
+  title                   String
+  description             String                     @default("")
+  enabled                 Boolean                    @default(true)
+  displayOrder            Int
+  assignments             CreatorProductAssignment[]
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  @@index([creatorRecommendationId, enabled, displayOrder])
+}
+
+model CreatorProductAssignment {
+  id           String                         @id @default(cuid())
+  groupId      String
+  group        CreatorRecommendationGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product                        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  enabled      Boolean                        @default(true)
+  displayOrder Int
+  createdAt    DateTime                       @default(now())
+  updatedAt    DateTime                       @updatedAt
+
+  @@unique([groupId, productId])
+  @@index([groupId, enabled, displayOrder])
+  @@index([productId, enabled])
+}
+
+model CreatorGuideLink {
+  id                      String                @id @default(cuid())
+  creatorRecommendationId String
+  creatorRecommendation   CreatorRecommendation @relation(fields: [creatorRecommendationId], references: [id], onDelete: Cascade)
+  label                   String
+  url                     String
+  enabled                 Boolean               @default(true)
+  displayOrder            Int
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  @@index([creatorRecommendationId, enabled, displayOrder])
 }
 
 model AffiliateProduct {
@@ -260,6 +328,12 @@ model ContentPage {
   navigationLabel       String   @default("")
   showInNavigation      Boolean  @default(false)
   navigationOrder       Int      @default(0)
+  enabled               Boolean  @default(true)
+  requiredPageKey       String?  @unique
+  showInFooter          Boolean  @default(false)
+  footerLabel           String   @default("")
+  footerOrder           Int      @default(0)
+  footerGroup           String   @default("Resources")
   publishedAt           DateTime?
   seoTitle              String   @default("")
   metaDescription       String   @default("")
@@ -277,9 +351,41 @@ model ContentPage {
   noindex               Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+  faqEntries            FaqEntry[]
 
   @@index([status, publishedAt])
   @@index([showInNavigation, navigationOrder])
+  @@index([showInFooter, footerGroup, footerOrder])
+}
+
+model FaqEntry {
+  id           String      @id @default(cuid())
+  pageId       String
+  page         ContentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  question     String
+  answer       String
+  category     String      @default("General")
+  displayOrder Int         @default(0)
+  enabled      Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([pageId, enabled, displayOrder])
+}
+
+model ContactSubmission {
+  id                  String   @id @default(cuid())
+  name                String
+  email               String
+  subject             String
+  message             String
+  status              String   @default("new")
+  consentAcknowledged Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email, createdAt])
 }
 
 model ContentCategory {
@@ -347,6 +453,7 @@ model ContentRevision {
   contentKind      String
   titleSnapshot    String
   bodySnapshot     String
+  structuredSnapshot String?
   editorIdentifier String?
   createdAt        DateTime @default(now())
 

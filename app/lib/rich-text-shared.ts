@@ -8,8 +8,21 @@ export interface RichTextProductSummary {
   affiliateUrl: string;
   imageUrl: string | null;
   priceText: string;
+  badge: string;
   shortDescription: string;
   componentType: string;
+}
+
+export const AFFILIATE_LINK_REL = 'sponsored nofollow noopener';
+
+export function hasInlineAffiliateLinks(body: string) {
+  return /<a\b[^>]*\bdata-link-kind=["']affiliate["'][^>]*>/i.test(body);
+}
+
+export function inlineAffiliateProductIds(body: string) {
+  const ids: string[] = [];
+  for (const match of body.matchAll(/<a\b[^>]*\bdata-affiliate-product-id=["']([^"']+)["'][^>]*>/gi)) ids.push(match[1]);
+  return Array.from(new Set(ids));
 }
 
 export function isRichTextBody(body: string) {
@@ -42,6 +55,17 @@ export function affiliateProductIds(body: string) {
 
 export function affiliateProductHtml(product: Pick<RichTextProductSummary, 'id' | 'title'>) {
   return `<cms-affiliate product-id="${escapeAttribute(product.id)}" contenteditable="false"><strong>Affiliate product</strong><span>${escapeHtml(product.title)}</span><small>Managed product block</small></cms-affiliate><p><br></p>`;
+}
+
+export function replaceAffiliateProduct(body: string, productId: string, product: Pick<RichTextProductSummary, 'id' | 'title'>) {
+  const escapedId = escapeRegExp(productId);
+  const replacement = affiliateProductHtml(product).replace(/<p><br><\/p>$/, '');
+  const editorHtml = bodyToEditorHtml(body);
+  const nextHtml = editorHtml.replace(
+    new RegExp(`<cms-affiliate\\b[^>]*\\bproduct-id=["']${escapedId}["'][^>]*>[\\s\\S]*?<\\/cms-affiliate>`, 'i'),
+    replacement,
+  );
+  return richTextBody(nextHtml);
 }
 
 export function removeAffiliateProduct(body: string, productId: string) {
