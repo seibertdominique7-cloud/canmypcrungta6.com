@@ -3,6 +3,8 @@ import 'server-only';
 import type {
   Product,
   RecommendationAssignment,
+  RecommendationRule,
+  RecommendationRuleOverride,
   RecommendationScenario,
   RecommendationSection,
 } from '../../generated/prisma/client';
@@ -21,6 +23,8 @@ import {
   type ProductInput,
 } from './catalog-validation';
 import { prisma } from './prisma';
+import { isPublicHttpsUrl } from './affiliate-validation';
+import { serializeRecommendationRule } from './recommendation-rules-data';
 
 type ProductUsage = RecommendationAssignment & {
   section: RecommendationSection & { scenario: RecommendationScenario };
@@ -30,26 +34,22 @@ type AssignmentWithProduct = RecommendationAssignment & { product: Product };
 type SectionWithAssignments = RecommendationSection & {
   assignments: AssignmentWithProduct[];
 };
+type RuleWithOverrides = RecommendationRule & {
+  overrides: Array<RecommendationRuleOverride & { product: Product }>;
+};
 type ScenarioWithAssignments = RecommendationScenario & {
   sections: SectionWithAssignments[];
+  recommendationRules: RuleWithOverrides[];
+  creatorRules: Array<{ id: string }>;
 };
 
 export async function getCatalogProducts(): Promise<ProductRecord[]> {
-  const products = await prisma.product.findMany({
-    orderBy: [{ title: 'asc' }, { createdAt: 'asc' }],
-    include: {
-      assignments: {
-        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-        include: { section: { include: { scenario: true } } },
-      },
-    },
-  });
-
+  const products = await getCatalogProductModels();
   return products.map(serializeCatalogProduct);
 }
 
 export async function getRecommendationWorkspace(): Promise<RecommendationWorkspace> {
-  const [scenarios, products] = await Promise.all([
+  const [scenarios, productModels] = await Promise.all([
     prisma.recommendationScenario.findMany({
       where: { groupType: 'SCENARIO' },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
@@ -63,14 +63,30 @@ export async function getRecommendationWorkspace(): Promise<RecommendationWorksp
             },
           },
         },
+        recommendationRules: {
+          orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+          include: { overrides: { include: { product: true } } },
+        },
+        creatorRules: { select: { id: true } },
       },
     }),
-    getCatalogProducts(),
+    getCatalogProductModels(),
   ]);
+  const products = productModels.map(serializeCatalogProduct);
 
   return {
-    scenarios: scenarios.map(serializeWorkspaceScenario),
+    scenarios: scenarios.map((scenario) =>
+      serializeWorkspaceScenario(scenario, productModels),
+    ),
     products,
+    catalogSummary: {
+      enabledProducts: productModels.filter((product) => product.enabled).length,
+      disabledProducts: productModels.filter((product) => !product.enabled).length,
+      invalidUrls: productModels.filter(
+        (product) => !isPublicHttpsUrl(product.affiliateUrl),
+      ).length,
+      missingImages: productModels.filter((product) => !product.imageUrl).length,
+    },
   };
 }
 
@@ -252,13 +268,21 @@ export async function moveRecommendationAssignment(id: string, direction: 'up' |
 
 function serializeWorkspaceScenario(
   scenario: ScenarioWithAssignments,
+  products: ProductWithUsage[],
 ): RecommendationScenarioRecord {
+  const {
+    sections,
+    recommendationRules,
+    creatorRules,
+    ...scenarioFields
+  } = scenario;
+  const assignments = sections.flatMap((section) => section.assignments);
   return {
-    ...scenario,
+    ...scenarioFields,
     groupType: scenario.groupType as RecommendationScenarioRecord['groupType'],
     createdAt: scenario.createdAt.toISOString(),
     updatedAt: scenario.updatedAt.toISOString(),
-    sections: scenario.sections.map((section) => ({
+    sections: sections.map((section) => ({
       ...section,
       layout: section.layout as RecommendationScenarioRecord['sections'][number]['layout'],
       purpose: section.purpose as RecommendationScenarioRecord['sections'][number]['purpose'],
@@ -267,7 +291,23 @@ function serializeWorkspaceScenario(
       assignments: section.assignments.map(serializeAssignment),
       products: section.assignments.map(flattenAssignmentProduct),
     })),
+    rules: recommendationRules.map((rule) =>
+      serializeRecommendationRule(rule, products, assignments),
+    ),
+    creatorRuleCount: creatorRules.length,
   };
+}
+
+function getCatalogProductModels() {
+  return prisma.product.findMany({
+    orderBy: [{ title: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      assignments: {
+        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+        include: { section: { include: { scenario: true } } },
+      },
+    },
+  });
 }
 
 function serializeAssignment(assignment: AssignmentWithProduct): RecommendationAssignmentRecord {
@@ -322,6 +362,7 @@ function serializeProductWithoutUsage(product: Product): ProductRecord {
     retailer: product.retailer as ProductRecord['retailer'],
     componentType: product.componentType as ProductRecord['componentType'],
     platform: product.platform as ProductRecord['platform'],
+    valueTier: product.valueTier as ProductRecord['valueTier'],
     usage: [],
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),

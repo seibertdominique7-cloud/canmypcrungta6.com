@@ -26,6 +26,15 @@ export const PRODUCT_COMPONENT_TYPES = [
   'Other',
 ] as const;
 
+export const PRODUCT_VALUE_TIERS = [
+  'Minimum',
+  'Budget',
+  'Best Value',
+  'Recommended',
+  'Performance',
+  'Premium',
+] as const;
+
 // Retained for the rollback-only AffiliateProduct API. New catalog forms use
 // PRODUCT_COMPONENT_TYPES exclusively.
 export const AFFILIATE_COMPONENT_TYPES = [
@@ -61,6 +70,7 @@ export const GAME_RELEASE_STATUSES = [
 export type AffiliateRetailer = (typeof AFFILIATE_RETAILERS)[number];
 export type AffiliateComponentType = (typeof AFFILIATE_COMPONENT_TYPES)[number];
 export type ProductComponentType = (typeof PRODUCT_COMPONENT_TYPES)[number];
+export type ProductValueTier = (typeof PRODUCT_VALUE_TIERS)[number];
 export type AffiliateBadge = (typeof AFFILIATE_BADGES)[number];
 export type RecommendationGroupType = (typeof RECOMMENDATION_GROUP_TYPES)[number];
 export type GamePurchasePlatform = (typeof GAME_PURCHASE_PLATFORMS)[number];
@@ -106,6 +116,7 @@ export interface ProductRecord {
   affiliateUrl: string;
   defaultPriceText: string;
   platform: GamePurchasePlatform | null;
+  valueTier: ProductValueTier | null;
   enabled: boolean;
   usage: ProductUsageRecord[];
   createdAt: string;
@@ -128,7 +139,65 @@ export interface RecommendationAssignmentRecord {
 }
 
 export type RecommendationSectionLayout = 'grid' | 'horizontal' | 'featured';
-export type RecommendationSectionPurpose = 'GENERAL' | 'GAME_PURCHASE' | 'PREBUILT';
+export type RecommendationSectionPurpose =
+  | 'GENERAL'
+  | 'GAME_PURCHASE'
+  | 'PREBUILT'
+  | 'GUIDANCE';
+export type RecommendationRuleMode = 'AUTOMATIC' | 'MANUAL';
+export type RecommendationRuleSource = 'LAUNCH_DEFAULT' | 'MANUAL';
+export type RecommendationRuleSortOrder =
+  | 'TIER_DIVERSITY'
+  | 'COMPONENT_DIVERSITY'
+  | 'ADMIN_ORDER';
+export type RecommendationRuleOverrideAction = 'PIN' | 'EXCLUDE';
+
+export interface RecommendationRuleOverrideRecord {
+  id: string;
+  productId: string;
+  action: RecommendationRuleOverrideAction;
+  displayOrder: number;
+  product: ProductRecord;
+}
+
+export interface RecommendationRuleRecord {
+  id: string;
+  scenarioId: string;
+  key: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  displayOrder: number;
+  mode: RecommendationRuleMode;
+  allowedComponentTypes: string[];
+  allowedValueTiers: ProductValueTier[];
+  tierPriority: ProductValueTier[];
+  fallbackComponentTypes: string[];
+  fallbackValueTiers: ProductValueTier[];
+  maxProducts: number;
+  sortOrder: RecommendationRuleSortOrder;
+  layout: RecommendationSectionLayout;
+  purpose: RecommendationSectionPurpose;
+  collapsedByDefault: boolean;
+  emptyStateTitle: string;
+  emptyStateDescription: string;
+  emptyCtaLabel: string;
+  emptyCtaUrl: string;
+  sourceSectionId: string | null;
+  source: RecommendationRuleSource;
+  overrides: RecommendationRuleOverrideRecord[];
+  previewProducts: ProductRecord[];
+  summary: {
+    eligibleProducts: number;
+    selectedProducts: number;
+    missingComponentTypes: string[];
+    invalidProducts: number;
+    disabledProducts: number;
+    fallbacksUsed: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface RecommendationSectionRecord {
   id: string;
@@ -151,6 +220,12 @@ export interface RecommendationSectionRecord {
 export interface RecommendationWorkspace {
   scenarios: RecommendationScenarioRecord[];
   products: ProductRecord[];
+  catalogSummary?: {
+    enabledProducts: number;
+    disabledProducts: number;
+    invalidUrls: number;
+    missingImages: number;
+  };
 }
 
 export interface RecommendationScenarioRecord {
@@ -164,6 +239,8 @@ export interface RecommendationScenarioRecord {
   isCore: boolean;
   groupType: RecommendationGroupType;
   sections: RecommendationSectionRecord[];
+  rules?: RecommendationRuleRecord[];
+  creatorRuleCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -193,6 +270,17 @@ export interface PublicRecommendationSection {
   layout: RecommendationSectionLayout;
   purpose: RecommendationSectionPurpose;
   products: AffiliateProductRecord[];
+  selection?: {
+    mode: RecommendationRuleMode;
+    source: RecommendationRuleSource;
+    eligibleProducts: number;
+    fallbackUsed: string[];
+    selectedValueTiers: ProductValueTier[];
+  };
+  emptyStateTitle?: string;
+  emptyStateDescription?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
 }
 
 export interface PublicRecommendationPayload {
@@ -218,6 +306,9 @@ export interface RecommendationDebugInfo {
   }>;
   sectionsWithoutEnabledProducts: string[];
   productsRejectedByUrl: string[];
+  rulesFound?: number;
+  fallbacksUsed?: string[];
+  missingComponentTypes?: string[];
 }
 
 export type PublicMonetizationPayload = PublicRecommendationPayload | null;

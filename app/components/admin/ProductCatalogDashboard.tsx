@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AFFILIATE_RETAILERS,
   PRODUCT_COMPONENT_TYPES,
+  PRODUCT_VALUE_TIERS,
   type AffiliateProductRecord,
   type ProductRecord,
 } from '../../lib/affiliate-types';
@@ -70,15 +71,29 @@ export function ProductCatalogDashboard({
   const [query, setQuery] = useState('');
   const [componentType, setComponentType] = useState('all');
   const [retailer, setRetailer] = useState('all');
+  const [valueTier, setValueTier] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'title' | 'tier-asc' | 'tier-desc'>('title');
 
   const visibleProducts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
       if (componentType !== 'all' && product.componentType !== componentType) return false;
       if (retailer !== 'all' && product.retailer !== retailer) return false;
+      if (valueTier === 'unset' && product.valueTier !== null) return false;
+      if (valueTier !== 'all' && valueTier !== 'unset' && product.valueTier !== valueTier) return false;
       return !normalized || `${product.title} ${product.canonicalName} ${product.retailer}`.toLowerCase().includes(normalized);
     });
-  }, [componentType, products, query, retailer]);
+    return filtered.sort((left, right) => {
+      if (sortOrder === 'title') return left.title.localeCompare(right.title);
+      if (left.valueTier === null && right.valueTier !== null) return 1;
+      if (left.valueTier !== null && right.valueTier === null) return -1;
+      const leftIndex = left.valueTier ? PRODUCT_VALUE_TIERS.indexOf(left.valueTier) : PRODUCT_VALUE_TIERS.length;
+      const rightIndex = right.valueTier ? PRODUCT_VALUE_TIERS.indexOf(right.valueTier) : PRODUCT_VALUE_TIERS.length;
+      const tierDifference = leftIndex - rightIndex;
+      return (sortOrder === 'tier-desc' ? -tierDifference : tierDifference) ||
+        left.title.localeCompare(right.title);
+    });
+  }, [componentType, products, query, retailer, sortOrder, valueTier]);
 
   const request = async (url: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) => {
     setBusy(true);
@@ -131,12 +146,15 @@ export function ProductCatalogDashboard({
               <h1 className="mt-2 text-3xl font-black">Product Catalog</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Create each product once, then assign it to any recommendation section.</p>
             </div>
-            <button className={primaryButton} disabled={busy} onClick={() => setEditor('new')} type="button">Add product</button>
+            <div className="flex flex-wrap gap-2">
+              <button className={secondaryButton} onClick={() => window.location.assign('/api/admin/products/export')} type="button">Export Products CSV</button>
+              <button className={primaryButton} disabled={busy} onClick={() => setEditor('new')} type="button">Add product</button>
+            </div>
           </div>
 
           {(notice || error) ? <StatusMessage error={error}>{error || notice}</StatusMessage> : null}
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <input aria-label="Search products" className={inputClass} onChange={(event) => setQuery(event.target.value)} placeholder="Search products" type="search" value={query} />
             <select aria-label="Filter by component type" className={inputClass} onChange={(event) => setComponentType(event.target.value)} value={componentType}>
               <option value="all">All component types</option>
@@ -146,6 +164,16 @@ export function ProductCatalogDashboard({
               <option value="all">All retailers</option>
               {AFFILIATE_RETAILERS.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
+            <select aria-label="Filter by value tier" className={inputClass} onChange={(event) => setValueTier(event.target.value)} value={valueTier}>
+              <option value="all">All value tiers</option>
+              <option value="unset">Value tier not set</option>
+              {PRODUCT_VALUE_TIERS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+            <select aria-label="Sort products" className={inputClass} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)} value={sortOrder}>
+              <option value="title">Sort: Product title</option>
+              <option value="tier-asc">Sort: Value tier (low to high)</option>
+              <option value="tier-desc">Sort: Value tier (high to low)</option>
+            </select>
           </div>
 
           <p className="mt-4 text-xs text-slate-500">{visibleProducts.length} of {products.length} products</p>
@@ -154,7 +182,10 @@ export function ProductCatalogDashboard({
               <article className="flex h-full flex-col rounded-3xl border border-white/10 bg-black/20 p-4" key={product.id}>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="truncate text-xs text-slate-500">{getDomain(product.affiliateUrl)}</p>
-                  <span className={product.enabled ? enabledBadge : disabledBadge}>{product.enabled ? 'Enabled' : 'Disabled'}</span>
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    <span className={product.valueTier ? valueTierBadge : unsetTierBadge}>{product.valueTier ?? 'Tier not set'}</span>
+                    <span className={product.enabled ? enabledBadge : disabledBadge}>{product.enabled ? 'Enabled' : 'Disabled'}</span>
+                  </div>
                 </div>
                 <RecommendationProductCard preview product={toPreviewProduct(product)} />
                 <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-400">
@@ -189,7 +220,7 @@ export function ProductCatalogDashboard({
 
 function ProductForm({ product, busy, fieldErrors, media, folders, onMediaChange, onSave }: { product: ProductRecord | null; busy: boolean; fieldErrors: Record<string, string>; media: MediaAssetRecord[]; folders: MediaFolderRecord[]; onMediaChange: (media: MediaAssetRecord[]) => void; onSave: (input: ProductInput, id?: string) => void }) {
   const [draft, setDraftState] = useState<ProductInput>(() => product ? toProductInput(product) : {
-    title: '', componentType: 'Other', affiliateUrl: '', imageUrl: null, shortDescription: '', retailer: 'Other', defaultPriceText: 'Check Current Price', platform: null, enabled: true,
+    title: '', componentType: 'Other', affiliateUrl: '', imageUrl: null, shortDescription: '', retailer: 'Other', defaultPriceText: 'Check Current Price', platform: null, valueTier: null, enabled: true,
   });
   const draftRef = useRef(draft);
   const manuallyEditedRef = useRef(new Set<ImportableField>());
@@ -293,6 +324,12 @@ function ProductForm({ product, busy, fieldErrors, media, folders, onMediaChange
         <Field error={errors.retailer} label="Retailer"><select className={inputClass} onChange={(event) => { markManual('retailer'); setDraft({ ...draft, retailer: event.target.value as ProductInput['retailer'] }); }} value={draft.retailer}>{AFFILIATE_RETAILERS.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
         <Field error={errors.defaultPriceText} label="Default price text (optional)"><input className={inputClass} onChange={(event) => setDraft({ ...draft, defaultPriceText: event.target.value })} placeholder="Check Current Price" value={draft.defaultPriceText} /></Field>
       </div>
+      <Field error={errors.valueTier} label="Value Tier">
+        <select className={inputClass} onChange={(event) => setDraft({ ...draft, valueTier: (event.target.value || null) as ProductInput['valueTier'] })} value={draft.valueTier ?? ''}>
+          <option value="">Not set</option>
+          {PRODUCT_VALUE_TIERS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </Field>
       <label className="flex items-center gap-3 text-sm font-bold text-slate-300"><input checked={draft.enabled} className="size-4 accent-violet-500" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} type="checkbox" />Product enabled</label>
       <section className="rounded-2xl border border-white/10 bg-black/20 p-4"><p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-violet-300">Card preview</p><div className="mx-auto max-w-sm"><RecommendationProductCard preview product={toPreviewProduct({ ...draft, id: product?.id ?? 'preview' })} /></div></section>
       <button className={primaryButton} disabled={busy} type="submit">{busy ? 'Saving…' : 'Save Product'}</button>
@@ -360,7 +397,7 @@ function getImportFieldLabel(field: ImportableField) {
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"><div className="mx-auto my-6 max-w-2xl rounded-3xl border border-white/15 bg-[#0d111d] p-5 shadow-2xl sm:p-6"><div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black">{title}</h2><button className={secondaryButton} onClick={onClose} type="button">Close</button></div>{children}</div></div>; }
 function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}{error ? <span className="text-xs text-red-300">{error}</span> : null}</label>; }
 function StatusMessage({ children, error }: { children: ReactNode; error?: string }) { return <p aria-live="polite" className={`mt-4 rounded-xl border px-3 py-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>{children}</p>; }
-function toProductInput(product: ProductRecord): ProductInput { return { title: product.title, componentType: product.componentType, affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, shortDescription: product.shortDescription, retailer: product.retailer, defaultPriceText: product.defaultPriceText, platform: product.platform, enabled: product.enabled }; }
+function toProductInput(product: ProductRecord): ProductInput { return { title: product.title, componentType: product.componentType, affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, shortDescription: product.shortDescription, retailer: product.retailer, defaultPriceText: product.defaultPriceText, platform: product.platform, valueTier: product.valueTier, enabled: product.enabled }; }
 function toPreviewProduct(product: Pick<ProductRecord, 'id' | 'title' | 'retailer' | 'affiliateUrl' | 'imageUrl' | 'defaultPriceText' | 'shortDescription' | 'componentType' | 'platform' | 'enabled'>): AffiliateProductRecord { return { id: product.id, productId: product.id, title: product.title, retailer: product.retailer, affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, priceText: product.defaultPriceText, badge: 'None', shortDescription: product.shortDescription, buttonText: 'View Product', componentType: product.componentType, platform: product.platform, enabled: product.enabled, displayOrder: 0, sectionId: '', createdAt: '', updatedAt: '' }; }
 function getDomain(value: string) { try { return new URL(value).hostname.toLowerCase(); } catch { return ''; } }
 
@@ -370,3 +407,5 @@ const secondaryButton = 'rounded-xl border border-white/15 bg-white/5 px-4 py-2 
 const dangerButton = 'rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-200 hover:bg-red-500/20 disabled:opacity-50';
 const enabledBadge = 'rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-300';
 const disabledBadge = 'rounded-full bg-slate-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-400';
+const valueTierBadge = 'rounded-full border border-violet-400/20 bg-violet-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-violet-200';
+const unsetTierBadge = 'rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-slate-500';

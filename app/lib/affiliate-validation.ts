@@ -309,10 +309,7 @@ export function validateGamePurchaseLinkInput(
 export function isPlaceholderAffiliateUrl(value: string) {
   try {
     const parsed = new URL(value);
-    return (
-      parsed.hostname.toLowerCase() === 'example.com' &&
-      parsed.pathname.startsWith('/replace-me/')
-    );
+    return parsed.hostname.toLowerCase() === 'example.com';
   } catch {
     return true;
   }

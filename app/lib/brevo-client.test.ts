@@ -4,19 +4,23 @@ import { upsertBrevoContact } from './brevo-client';
 
 describe('Brevo contact sync', () => {
   it('adds or updates the normalized contact in the configured list', async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 201 }));
+    const requests: Array<[URL | RequestInfo, RequestInit | undefined]> = [];
+    const fetchMock: typeof fetch = vi.fn(async (input, init) => {
+      requests.push([input, init]);
+      return new Response(null, { status: 201 });
+    });
 
     const result = await upsertBrevoContact({
       apiKey: 'test-api-key',
       email: 'player@example.com',
       listId: 3,
-      fetchImpl: fetchMock as typeof fetch,
+      fetchImpl: fetchMock,
     });
 
     expect(result).toEqual({ status: 'synced' });
     expect(fetchMock).toHaveBeenCalledOnce();
 
-    const [endpoint, request] = fetchMock.mock.calls[0];
+    const [endpoint, request] = requests[0];
     expect(endpoint).toBe('https://api.brevo.com/v3/contacts');
     expect(request).toMatchObject({
       method: 'POST',

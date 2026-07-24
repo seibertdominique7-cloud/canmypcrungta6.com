@@ -70,12 +70,14 @@ export interface ArticleRecord extends SeoFields {
   excerpt: string;
   body: string;
   featuredImage: string | null;
+  featuredImagePrompt: string;
   authorName: string;
   status: ContentStatus;
   publishedAt: string | null;
   scheduledAt: string | null;
   featured: boolean;
   contentType: ArticleContentType;
+  secondaryKeywords: string[];
   categories: Array<ContentCategoryRecord & { isPrimary: boolean }>;
   tags: ContentTagRecord[];
   relatedArticleIds: string[];

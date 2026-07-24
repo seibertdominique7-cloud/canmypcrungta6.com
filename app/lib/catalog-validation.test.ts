@@ -14,6 +14,7 @@ describe('catalog product validation', () => {
       componentType: 'GPU',
       affiliateUrl,
       retailer: 'Amazon',
+      valueTier: 'Best Value',
       enabled: true,
     });
 
@@ -23,9 +24,29 @@ describe('catalog product validation', () => {
       componentType: 'GPU',
       affiliateUrl,
       retailer: 'Amazon',
+      valueTier: 'Best Value',
       shortDescription: '',
       defaultPriceText: 'Check Current Price',
     });
+  });
+
+  it('accepts an unset value tier and rejects labels outside the permanent list', () => {
+    const unset = validateProductInput({
+      title: 'RTX 4070',
+      componentType: 'GPU',
+      affiliateUrl: 'https://example.net/product',
+      valueTier: null,
+    });
+    const invalid = validateProductInput({
+      title: 'RTX 4070',
+      componentType: 'GPU',
+      affiliateUrl: 'https://example.net/product',
+      valueTier: 'Entry Level',
+    });
+
+    expect(unset.fieldErrors).toEqual({});
+    expect(unset.data?.valueTier).toBeNull();
+    expect(invalid.fieldErrors.valueTier).toBe('Choose a valid value tier.');
   });
 
   it('rejects non-HTTPS affiliate URLs and warns about a likely missing Amazon tag', () => {

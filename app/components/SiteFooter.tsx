@@ -16,6 +16,8 @@ export async function SiteFooter() {
   groups.get('Resources')?.push(
     { href: '/', label: content.navigation_checker_label || 'PC Checker', order: 10 },
     { href: '/articles', label: content.navigation_articles_label || 'Articles', order: 20 },
+    { href: '/creator-setup-builder', label: 'Creator Setup Builder', order: 30 },
+    { href: '/creator-setup-guide', label: 'Creator Setup Guide', order: 40 },
   );
   groups.get('Legal')?.push({ href: '/affiliate-disclosure', label: 'Affiliate Disclosure', order: 40 });
 

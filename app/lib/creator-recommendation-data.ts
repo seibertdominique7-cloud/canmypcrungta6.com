@@ -5,9 +5,18 @@ import type {
   CreatorProductAssignment,
   CreatorRecommendation,
   CreatorRecommendationGroup,
+  CreatorRecommendationRule,
   Product,
 } from '../../generated/prisma/client';
-import { CREATOR_FALLBACK } from '../data/creator-recommendations';
+import {
+  CREATOR_FALLBACK,
+  CREATOR_SCENARIO_DEFAULTS,
+} from '../data/creator-recommendations';
+import type {
+  CreatorDerivedCategory,
+  CreatorRuleDefinition,
+  RecommendationRuleComponentType,
+} from '../data/recommendation-rule-defaults';
 import {
   isCoreRecommendationScenarioCode,
   type CoreRecommendationScenarioCode,
@@ -24,6 +33,8 @@ import type {
 } from './creator-recommendation-types';
 import { isSafeCreatorDestination } from './creator-recommendation-validation';
 import { prisma } from './prisma';
+import { parseRuleArray } from './recommendation-rules-data';
+import { selectCreatorProducts } from './recommendation-rule-engine';
 
 type CreatorAssignmentWithProduct = CreatorProductAssignment & { product: Product };
 type CreatorGroupWithAssignments = CreatorRecommendationGroup & {
@@ -176,56 +187,108 @@ export async function saveCreatorRecommendation(input: CreatorRecommendationInpu
 
 export async function getPublicCreatorRecommendation(
   scenarioCode: CoreRecommendationScenarioCode,
+  excludedProductIds: ReadonlySet<string> = new Set(),
 ): Promise<PublicCreatorRecommendationPayload> {
-  const scenario = await prisma.recommendationScenario.findFirst({
-    where: { code: scenarioCode, groupType: 'SCENARIO' },
-    include: { creatorRecommendation: { include: creatorInclude } },
-  });
+  const [scenario, products] = await Promise.all([
+    prisma.recommendationScenario.findFirst({
+      where: { code: scenarioCode, groupType: 'SCENARIO' },
+      include: {
+        creatorRecommendation: { include: creatorInclude },
+        creatorRules: { orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }] },
+      },
+    }),
+    prisma.product.findMany(),
+  ]);
   const recommendation = scenario?.creatorRecommendation;
 
-  if (!recommendation?.enabled) return getCreatorFallbackPayload(scenarioCode);
+  if (recommendation?.enabled) {
+    const groups = recommendation.groups
+      .filter((group) => group.enabled)
+      .map((group) => ({
+        id: group.id,
+        title: group.title,
+        description: group.description,
+        products: group.assignments
+          .filter(
+            (assignment) =>
+              assignment.enabled &&
+              assignment.product.enabled &&
+              isPublicHttpsUrl(assignment.product.affiliateUrl),
+          )
+          .map((assignment) => serializePublicProduct(assignment, group.id)),
+      }))
+      .filter((group) => group.products.length > 0);
+    const guides = recommendation.guides
+      .filter((guide) => guide.enabled && isSafeCreatorDestination(guide.url))
+      .map((guide) => ({ id: guide.id, label: guide.label, url: guide.url }));
 
-  const groups = recommendation.groups
-    .filter((group) => group.enabled)
-    .map((group) => ({
-      id: group.id,
-      title: group.title,
-      description: group.description,
-      products: group.assignments
-        .filter(
-          (assignment) =>
-            assignment.enabled &&
-            assignment.product.enabled &&
-            isPublicHttpsUrl(assignment.product.affiliateUrl),
-        )
-        .map((assignment) => serializePublicProduct(assignment, group.id)),
-    }))
-    .filter((group) => group.products.length > 0);
-  const guides = recommendation.guides
-    .filter((guide) => guide.enabled && isSafeCreatorDestination(guide.url))
-    .map((guide) => ({ id: guide.id, label: guide.label, url: guide.url }));
+    return {
+      scenarioCode,
+      source: 'custom',
+      headline: recommendation.headline,
+      subheadline: recommendation.subheadline,
+      description: recommendation.description,
+      warningText: recommendation.warningText,
+      primaryCtaLabel: recommendation.primaryCtaLabel,
+      primaryCtaUrl: isSafeCreatorDestination(recommendation.primaryCtaUrl)
+        ? recommendation.primaryCtaUrl
+        : CREATOR_FALLBACK.primaryCtaUrl,
+      secondaryCtaLabel:
+        recommendation.secondaryCtaLabel &&
+        isSafeCreatorDestination(recommendation.secondaryCtaUrl)
+          ? recommendation.secondaryCtaLabel
+          : '',
+      secondaryCtaUrl: isSafeCreatorDestination(recommendation.secondaryCtaUrl)
+        ? recommendation.secondaryCtaUrl
+        : '',
+      groups,
+      guides,
+    };
+  }
+
+  const creatorRules = scenario?.creatorRules.filter((rule) => rule.enabled) ?? [];
+  if (creatorRules.length === 0) return getCreatorFallbackPayload(scenarioCode);
+
+  const seenProductIds = new Set<string>(excludedProductIds);
+  const groups = creatorRules.flatMap((rule) => {
+    const selected = selectCreatorProducts(
+      products,
+      toCreatorRuleDefinition(rule),
+      seenProductIds,
+    );
+    for (const product of selected) seenProductIds.add(product.id);
+    if (selected.length === 0) return [];
+    return [{
+      id: rule.id,
+      title: rule.title,
+      description: rule.description,
+      products: selected.map((product, index) =>
+        serializeAutomaticCreatorProduct(product, rule.id, index),
+      ),
+    }];
+  });
+  const copy = recommendation ?? CREATOR_SCENARIO_DEFAULTS[scenarioCode];
 
   return {
     scenarioCode,
-    source: 'custom',
-    headline: recommendation.headline,
-    subheadline: recommendation.subheadline,
-    description: recommendation.description,
-    warningText: recommendation.warningText,
-    primaryCtaLabel: recommendation.primaryCtaLabel,
-    primaryCtaUrl: isSafeCreatorDestination(recommendation.primaryCtaUrl)
-      ? recommendation.primaryCtaUrl
+    source: 'automatic',
+    headline: copy.headline,
+    subheadline: copy.subheadline,
+    description: copy.description,
+    warningText: copy.warningText,
+    primaryCtaLabel: copy.primaryCtaLabel,
+    primaryCtaUrl: isSafeCreatorDestination(copy.primaryCtaUrl)
+      ? copy.primaryCtaUrl
       : CREATOR_FALLBACK.primaryCtaUrl,
     secondaryCtaLabel:
-      recommendation.secondaryCtaLabel &&
-      isSafeCreatorDestination(recommendation.secondaryCtaUrl)
-        ? recommendation.secondaryCtaLabel
+      copy.secondaryCtaLabel && isSafeCreatorDestination(copy.secondaryCtaUrl)
+        ? copy.secondaryCtaLabel
         : '',
-    secondaryCtaUrl: isSafeCreatorDestination(recommendation.secondaryCtaUrl)
-      ? recommendation.secondaryCtaUrl
+    secondaryCtaUrl: isSafeCreatorDestination(copy.secondaryCtaUrl)
+      ? copy.secondaryCtaUrl
       : '',
     groups,
-    guides,
+    guides: [],
   };
 }
 
@@ -311,5 +374,51 @@ function serializePublicProduct(
     displayOrder: assignment.displayOrder,
     createdAt: assignment.createdAt.toISOString(),
     updatedAt: assignment.updatedAt.toISOString(),
+  };
+}
+
+function toCreatorRuleDefinition(rule: CreatorRecommendationRule): CreatorRuleDefinition {
+  return {
+    key: rule.key,
+    title: rule.title,
+    description: rule.description,
+    componentTypes: parseRuleArray(
+      rule.allowedComponentTypes,
+    ) as RecommendationRuleComponentType[],
+    valueTiers: parseRuleArray(rule.allowedValueTiers) as CreatorRuleDefinition['valueTiers'],
+    tierPriority: parseRuleArray(rule.tierPriority) as CreatorRuleDefinition['tierPriority'],
+    derivedCategories: parseRuleArray(
+      rule.derivedCategories,
+    ) as CreatorDerivedCategory[],
+    maxProducts: Math.max(0, rule.maxProducts),
+  };
+}
+
+function serializeAutomaticCreatorProduct(
+  product: Product,
+  groupId: string,
+  index: number,
+): AffiliateProductRecord {
+  return {
+    id: `automatic-creator-${groupId}-${product.id}`,
+    productId: product.id,
+    sectionId: groupId,
+    title: product.title,
+    retailer: product.retailer as AffiliateProductRecord['retailer'],
+    affiliateUrl: product.affiliateUrl,
+    imageUrl: product.imageUrl,
+    priceText: product.defaultPriceText,
+    badge: 'None',
+    shortDescription: product.shortDescription,
+    buttonText:
+      product.retailer === 'Other'
+        ? 'Check Current Price'
+        : `View on ${product.retailer}`,
+    componentType: product.componentType as AffiliateProductRecord['componentType'],
+    platform: product.platform as AffiliateProductRecord['platform'],
+    enabled: product.enabled,
+    displayOrder: (index + 1) * 10,
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
   };
 }

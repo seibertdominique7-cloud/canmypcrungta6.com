@@ -2,10 +2,12 @@ import {
   AFFILIATE_BADGES,
   AFFILIATE_RETAILERS,
   PRODUCT_COMPONENT_TYPES,
+  PRODUCT_VALUE_TIERS,
   type AffiliateBadge,
   type AffiliateRetailer,
   type GamePurchasePlatform,
   type ProductComponentType,
+  type ProductValueTier,
 } from './affiliate-types';
 import { inspectAffiliateUrl } from './affiliate-validation';
 
@@ -18,6 +20,7 @@ export interface ProductInput {
   retailer: AffiliateRetailer;
   defaultPriceText: string;
   platform: GamePurchasePlatform | null;
+  valueTier: ProductValueTier | null;
   enabled: boolean;
 }
 
@@ -67,6 +70,7 @@ export function validateProductInput(value: unknown): CatalogValidationResult<Pr
     boundedText(input.defaultPriceText, 'Default price text', 80, fieldErrors, false) ||
     'Check Current Price';
   const platform = stringValue(input.platform) || null;
+  const valueTier = stringValue(input.valueTier) || null;
   const urlInspection = inspectAffiliateUrl(affiliateUrl, retailerValue);
 
   if (!PRODUCT_COMPONENT_TYPES.includes(componentType as ProductComponentType)) {
@@ -74,6 +78,9 @@ export function validateProductInput(value: unknown): CatalogValidationResult<Pr
   }
   if (!AFFILIATE_RETAILERS.includes(retailerValue as AffiliateRetailer)) {
     fieldErrors.retailer = 'Choose a valid retailer.';
+  }
+  if (valueTier && !PRODUCT_VALUE_TIERS.includes(valueTier as ProductValueTier)) {
+    fieldErrors.valueTier = 'Choose a valid value tier.';
   }
   if (urlInspection.errors.length > 0) {
     fieldErrors.affiliateUrl = urlInspection.errors[0];
@@ -95,6 +102,7 @@ export function validateProductInput(value: unknown): CatalogValidationResult<Pr
             retailer: retailerValue as AffiliateRetailer,
             defaultPriceText,
             platform: platform as GamePurchasePlatform | null,
+            valueTier: valueTier as ProductValueTier | null,
             enabled: booleanValue(input.enabled, true),
           }
         : null,

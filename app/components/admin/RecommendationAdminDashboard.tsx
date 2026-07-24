@@ -6,8 +6,12 @@ import { useState, type ReactNode } from 'react';
 
 import {
   AFFILIATE_BADGES,
+  PRODUCT_COMPONENT_TYPES,
+  PRODUCT_VALUE_TIERS,
   type AffiliateProductRecord,
+  type ProductRecord,
   type RecommendationAssignmentRecord,
+  type RecommendationRuleRecord,
   type RecommendationWorkspace,
 } from '../../lib/affiliate-types';
 import type { AssignmentInput, AssignmentUpdateInput } from '../../lib/catalog-validation';
@@ -27,6 +31,34 @@ type AssignmentEditor =
   | { kind: 'edit'; assignment: RecommendationAssignmentRecord }
   | null;
 
+interface LaunchPreview {
+  scenarios: Array<{
+    code: string;
+    rulesToCreate: number;
+    rulesToUpdate: number;
+    manualRulesProtected: number;
+    creatorRulesToCreate: number;
+    creatorRulesToUpdate: number;
+    manualCreatorRulesProtected: number;
+  }>;
+}
+
+interface AuditReport {
+  generatedAt: string;
+  scenarios: Array<{
+    scenario: string;
+    status: string;
+    sectionsRendered: string[];
+    productsSelected: number;
+    selectedValueTiers: string[];
+    fallbacksUsed: string[];
+    missingComponentTypes: string[];
+    creatorGroupsRendered: string[];
+    emptyRules: string[];
+  }>;
+  summary: Record<string, number>;
+}
+
 export function RecommendationAdminDashboard({ initialWorkspace }: { initialWorkspace: RecommendationWorkspace }) {
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const [selectedScenarioId, setSelectedScenarioId] = useState(initialWorkspace.scenarios[0]?.id ?? '');
@@ -37,6 +69,11 @@ export function RecommendationAdminDashboard({ initialWorkspace }: { initialWork
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState<string[]>([]);
+  const [launchPreview, setLaunchPreview] = useState<LaunchPreview | null>(null);
+  const [launchSelection, setLaunchSelection] = useState<string[]>([]);
+  const [overwriteManual, setOverwriteManual] = useState(false);
+  const [audit, setAudit] = useState<AuditReport | null>(null);
+  const [ruleEditor, setRuleEditor] = useState<RecommendationRuleRecord | null>(null);
 
   const selectedScenario = workspace.scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? workspace.scenarios[0] ?? null;
   const selectedSection = selectedScenario?.sections.find((section) => section.id === selectedSectionId) ?? selectedScenario?.sections[0] ?? null;
@@ -92,28 +129,155 @@ export function RecommendationAdminDashboard({ initialWorkspace }: { initialWork
     if (saved) setSelectedAssignmentIds([]);
   };
 
+  const loadLaunchPreview = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/recommendation-rules/launch-defaults', {
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as { error?: string; preview?: LaunchPreview };
+      if (!response.ok || !payload.preview) {
+        throw new Error(payload.error || 'Launch-default preview could not be loaded.');
+      }
+      setLaunchPreview(payload.preview);
+      setLaunchSelection(payload.preview.scenarios.map((scenario) => scenario.code));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Preview failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runAudit = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/recommendation-rules/audit', {
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as { error?: string; audit?: AuditReport };
+      if (!response.ok || !payload.audit) {
+        throw new Error(payload.error || 'Scenario audit could not be completed.');
+      }
+      setAudit(payload.audit);
+      setNotice('All recommendation scenarios audited.');
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Audit failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyDefaults = async () => {
+    const saved = await request(
+      '/api/admin/recommendation-rules/launch-defaults',
+      'POST',
+      { scenarioCodes: launchSelection, overwriteManual },
+    );
+    if (saved) setLaunchPreview(null);
+  };
+
+  const updateRule = async (rule: RecommendationRuleRecord) => {
+    const saved = await request(`/api/admin/recommendation-rules/${rule.id}`, 'PATCH', rule);
+    if (saved) setRuleEditor(null);
+  };
+
+  const resetRule = async (rule: RecommendationRuleRecord) => {
+    if (!window.confirm(`Reset "${rule.title}" to its launch defaults? Explicit rule overrides will be removed; existing section assignments will be kept.`)) return;
+    await request(`/api/admin/recommendation-rules/${rule.id}`, 'PATCH', { action: 'reset' });
+  };
+
+  const setRuleOverride = async (
+    rule: RecommendationRuleRecord,
+    productId: string,
+    action: 'PIN' | 'EXCLUDE' | 'RESET',
+  ) => {
+    await request(`/api/admin/recommendation-rules/${rule.id}/overrides`, 'POST', {
+      productId,
+      action,
+    });
+  };
+
   return (
     <main className="admin-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl">
         <AdminHeader active="recommendations" />
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 sm:p-6">
-          <div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-300">Scenario placement</p>
             <h1 className="mt-2 text-3xl font-black">Recommendations</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Assign existing catalog products to one or more result sections. Removing an assignment never deletes its product.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className={primaryButton} disabled={busy} onClick={() => void loadLaunchPreview()} type="button">Apply Launch Defaults</button>
+              <button className={secondaryButton} disabled={busy} onClick={() => void runAudit()} type="button">Audit All Scenarios</button>
+              <a className={secondaryButton} href="/">Open Public Checker</a>
+            </div>
           </div>
           {(notice || error) ? <StatusMessage error={error}>{error || notice}</StatusMessage> : null}
 
           <div className="mt-6 grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="self-start rounded-2xl border border-white/10 bg-black/20 p-3 lg:sticky lg:top-4">
               <label className="grid gap-2 text-sm font-bold text-slate-300">Scenario<select className={inputClass} onChange={(event) => selectScenario(event.target.value)} value={selectedScenario?.id ?? ''}>{workspace.scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.code}</option>)}</select></label>
+              {selectedScenario ? (
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs">
+                  <span className="text-slate-400">Rule status</span>
+                  <span className={
+                    selectedScenario.rules?.length
+                      ? selectedScenario.rules.some((rule) => rule.source === 'MANUAL' || rule.mode === 'MANUAL')
+                        ? enabledBadge
+                        : 'rounded-full bg-violet-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-violet-300'
+                      : disabledBadge
+                  }>
+                    {selectedScenario.rules?.length
+                      ? selectedScenario.rules.some((rule) => rule.source === 'MANUAL' || rule.mode === 'MANUAL')
+                        ? 'Manual Override'
+                        : 'Automatic'
+                      : 'Incomplete'}
+                  </span>
+                </div>
+              ) : null}
               <div className="mt-4 grid gap-2">
                 {selectedScenario?.sections.map((section) => <button className={`rounded-xl border px-3 py-3 text-left text-sm ${selectedSection?.id === section.id ? 'border-violet-400/50 bg-violet-500/10' : 'border-white/10 bg-white/[0.03]'}`} key={section.id} onClick={() => { setSelectedSectionId(section.id); setSelectedAssignmentIds([]); }} type="button"><span className="block font-bold">{section.title}</span><span className="mt-1 block text-xs text-slate-500">{section.assignments?.length ?? 0} assignments</span></button>)}
               </div>
             </aside>
 
             <div className="min-w-0">
+              {selectedScenario?.rules?.length ? (
+                <section className="mb-5 rounded-2xl border border-violet-300/15 bg-violet-500/[0.04] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.15em] text-violet-300">Automatic selection rules</p>
+                      <h2 className="mt-1 text-xl font-black">Scenario recommendations</h2>
+                    </div>
+                    {workspace.catalogSummary ? (
+                      <p className="text-xs leading-5 text-slate-400">
+                        {workspace.catalogSummary.enabledProducts} enabled · {workspace.catalogSummary.disabledProducts} disabled · {workspace.catalogSummary.invalidUrls} invalid URLs · {workspace.catalogSummary.missingImages} missing images
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="mt-4 grid gap-3">
+                    {selectedScenario.rules.map((rule) => (
+                      <RuleCard
+                        busy={busy}
+                        key={rule.id}
+                        onEdit={() => setRuleEditor(rule)}
+                        onOverride={(productId, action) => void setRuleOverride(rule, productId, action)}
+                        onReset={() => void resetRule(rule)}
+                        products={workspace.products}
+                        rule={rule}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <div className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-400/[0.06] p-4 text-sm text-amber-100">
+                  This scenario has no automatic rules yet. Preview and apply the launch defaults above.
+                </div>
+              )}
               {selectedSection ? (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -149,8 +313,51 @@ export function RecommendationAdminDashboard({ initialWorkspace }: { initialWork
 
       {editor?.kind === 'add' ? <Modal onClose={() => setEditor(null)} title={editor.source ? 'Copy assignment' : 'Add Existing Product'}>{error ? <StatusMessage error={error}>{error}</StatusMessage> : null}<AssignmentForm busy={busy} currentSectionId={selectedSection?.id ?? ''} fieldErrors={fieldErrors} onSave={createAssignments} source={editor.source} workspace={workspace} /></Modal> : null}
       {editor?.kind === 'edit' ? <Modal onClose={() => setEditor(null)} title="Edit or move assignment">{error ? <StatusMessage error={error}>{error}</StatusMessage> : null}<EditAssignmentForm assignment={editor.assignment} busy={busy} fieldErrors={fieldErrors} onSave={updateAssignment} workspace={workspace} /></Modal> : null}
+      {launchPreview ? (
+        <Modal onClose={() => setLaunchPreview(null)} title="Apply Launch Defaults">
+          <p className="mt-3 text-sm leading-6 text-slate-400">Preview the rule records that will be created or refreshed. Product records and manual assignments are never changed.</p>
+          <div className="mt-4 grid max-h-[55vh] gap-2 overflow-y-auto pr-1">
+            {launchPreview.scenarios.map((scenario) => (
+              <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-3 text-sm" key={scenario.code}>
+                <input checked={launchSelection.includes(scenario.code)} className="mt-1 size-4 accent-violet-500" onChange={(event) => setLaunchSelection((current) => event.target.checked ? [...current, scenario.code] : current.filter((code) => code !== scenario.code))} type="checkbox" />
+                <span><strong className="block">{scenario.code}</strong><span className="text-xs text-slate-400">{scenario.rulesToCreate} rules to create · {scenario.rulesToUpdate} to refresh · {scenario.manualRulesProtected} manual protected · {scenario.creatorRulesToCreate} creator rules to create</span></span>
+              </label>
+            ))}
+          </div>
+          <label className="mt-4 flex items-start gap-3 text-sm text-amber-100"><input checked={overwriteManual} className="mt-1 size-4 accent-amber-400" onChange={(event) => setOverwriteManual(event.target.checked)} type="checkbox" /><span>Overwrite manually customized rule settings. Existing manual product assignments are still preserved.</span></label>
+          <button className={`${primaryButton} mt-5`} disabled={busy || launchSelection.length === 0} onClick={() => void applyDefaults()} type="button">{busy ? 'Applying…' : `Apply to ${launchSelection.length} scenarios`}</button>
+        </Modal>
+      ) : null}
+      {audit ? (
+        <Modal onClose={() => setAudit(null)} title="Recommendation Scenario Audit">
+          <p className="mt-3 text-xs text-slate-500">Generated {new Date(audit.generatedAt).toLocaleString()}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{Object.entries(audit.summary).map(([label, value]) => <div className="rounded-xl border border-white/10 bg-black/20 p-3" key={label}><span className="block text-xl font-black">{value}</span><span className="text-[10px] uppercase tracking-wide text-slate-500">{label.replaceAll(/([A-Z])/g, ' $1')}</span></div>)}</div>
+          <div className="mt-4 grid max-h-[55vh] gap-2 overflow-y-auto pr-1">{audit.scenarios.map((scenario) => <article className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm" key={scenario.scenario}><div className="flex items-center justify-between gap-3"><strong>{scenario.scenario}</strong><span className={scenario.status === 'Incomplete' ? disabledBadge : enabledBadge}>{scenario.status}</span></div><p className="mt-2 text-xs leading-5 text-slate-400">{scenario.sectionsRendered.join(' · ') || 'No rendered sections'}<br />{scenario.productsSelected} products · {scenario.selectedValueTiers.join(', ') || 'No tiers'}{scenario.fallbacksUsed.length ? ` · fallback: ${scenario.fallbacksUsed.join(', ')}` : ''}{scenario.missingComponentTypes.length ? ` · missing: ${scenario.missingComponentTypes.join(', ')}` : ''}</p></article>)}</div>
+        </Modal>
+      ) : null}
+      {ruleEditor ? (
+        <Modal onClose={() => setRuleEditor(null)} title="Edit Recommendation Rule">
+          <RuleForm busy={busy} onSave={updateRule} rule={ruleEditor} />
+        </Modal>
+      ) : null}
     </main>
   );
+}
+
+function RuleCard({ rule, products, busy, onEdit, onReset, onOverride }: { rule: RecommendationRuleRecord; products: ProductRecord[]; busy: boolean; onEdit: () => void; onReset: () => void; onOverride: (productId: string, action: 'PIN' | 'EXCLUDE' | 'RESET') => void }) {
+  const [pinProductId, setPinProductId] = useState('');
+  const availableProducts = products.filter((product) => !rule.overrides.some((override) => override.productId === product.id));
+  return <article className="rounded-2xl border border-white/10 bg-black/20 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-black">{rule.title}</h3><span className={rule.source === 'MANUAL' || rule.mode === 'MANUAL' ? enabledBadge : 'rounded-full bg-violet-500/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-violet-300'}>{rule.mode === 'MANUAL' ? 'Manual Override' : 'Automatic'}</span>{!rule.enabled ? <span className={disabledBadge}>Disabled</span> : null}</div><p className="mt-1 max-w-3xl text-xs leading-5 text-slate-400">{rule.description}</p></div><div className="flex gap-2"><button className={secondaryButton} onClick={onEdit} type="button">Edit Rule</button><button className={secondaryButton} disabled={busy} onClick={onReset} type="button">Reset</button></div></div><div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-4"><span><strong className="text-slate-200">{rule.summary.eligibleProducts}</strong> eligible</span><span><strong className="text-slate-200">{rule.summary.selectedProducts}</strong> selected / {rule.maxProducts}</span><span>{rule.allowedComponentTypes.join(', ') || 'Guidance only'}</span><span>{rule.allowedValueTiers.join(', ') || 'No tier filter'}</span></div>{rule.summary.missingComponentTypes.length || rule.summary.invalidProducts || rule.summary.disabledProducts ? <p className="mt-2 text-xs text-amber-200">Missing: {rule.summary.missingComponentTypes.join(', ') || 'none'} · Invalid URLs: {rule.summary.invalidProducts} · Disabled: {rule.summary.disabledProducts}</p> : null}<div className="mt-3 flex flex-wrap gap-2">{rule.previewProducts.map((product) => <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs" key={product.id}>{product.title}<button className="font-black text-red-300" disabled={busy} onClick={() => onOverride(product.id, 'EXCLUDE')} type="button">Exclude</button></span>)}</div>{rule.overrides.length ? <div className="mt-3 flex flex-wrap gap-2">{rule.overrides.map((override) => <span className="inline-flex items-center gap-2 rounded-lg border border-violet-300/20 bg-violet-500/10 px-2.5 py-1.5 text-xs" key={override.id}>{override.action}: {override.product.title}<button className="font-black text-slate-300" disabled={busy} onClick={() => onOverride(override.productId, 'RESET')} type="button">Clear</button></span>)}</div> : null}<div className="mt-3 flex gap-2"><select className={inputClass} onChange={(event) => setPinProductId(event.target.value)} value={pinProductId}><option value="">Pin an existing product…</option>{availableProducts.map((product) => <option key={product.id} value={product.id}>{product.title} — {product.valueTier ?? 'No tier'}</option>)}</select><button className={secondaryButton} disabled={busy || !pinProductId} onClick={() => { onOverride(pinProductId, 'PIN'); setPinProductId(''); }} type="button">Pin</button></div></article>;
+}
+
+function RuleForm({ rule, busy, onSave }: { rule: RecommendationRuleRecord; busy: boolean; onSave: (rule: RecommendationRuleRecord) => void }) {
+  const [draft, setDraft] = useState(rule);
+  const toggle = (field: 'allowedComponentTypes' | 'fallbackComponentTypes' | 'allowedValueTiers' | 'tierPriority' | 'fallbackValueTiers', value: string, checked: boolean) => setDraft((current) => ({ ...current, [field]: checked ? Array.from(new Set([...current[field], value])) : current[field].filter((item) => item !== value) }));
+  return <form className="mt-4 grid gap-4" onSubmit={(event) => { event.preventDefault(); onSave(draft); }}><Field label="Section title"><input className={inputClass} onChange={(event) => setDraft({ ...draft, title: event.target.value })} value={draft.title} /></Field><Field label="Description"><textarea className={`${inputClass} min-h-20`} onChange={(event) => setDraft({ ...draft, description: event.target.value })} value={draft.description} /></Field><div className="grid gap-4 sm:grid-cols-3"><Field label="Mode"><select className={inputClass} onChange={(event) => setDraft({ ...draft, mode: event.target.value as RecommendationRuleRecord['mode'] })} value={draft.mode}><option value="AUTOMATIC">Automatic</option><option value="MANUAL">Manual override</option></select></Field><Field label="Product limit"><input className={inputClass} max={12} min={0} onChange={(event) => setDraft({ ...draft, maxProducts: Number(event.target.value) })} type="number" value={draft.maxProducts} /></Field><Field label="Sort order"><select className={inputClass} onChange={(event) => setDraft({ ...draft, sortOrder: event.target.value as RecommendationRuleRecord['sortOrder'] })} value={draft.sortOrder}><option value="TIER_DIVERSITY">Tier diversity</option><option value="COMPONENT_DIVERSITY">Component diversity</option><option value="ADMIN_ORDER">Admin order</option></select></Field></div><RuleChecks label="Allowed component types" options={[...PRODUCT_COMPONENT_TYPES, 'Gaming Desktop', 'Prebuilt Laptop']} selected={draft.allowedComponentTypes} onToggle={(value, checked) => toggle('allowedComponentTypes', value, checked)} /><RuleChecks label="Allowed Value Tiers" options={PRODUCT_VALUE_TIERS} selected={draft.allowedValueTiers} onToggle={(value, checked) => toggle('allowedValueTiers', value, checked)} /><RuleChecks label="Tier priority" options={PRODUCT_VALUE_TIERS} selected={draft.tierPriority} onToggle={(value, checked) => toggle('tierPriority', value, checked)} /><RuleChecks label="Fallback component types" options={[...PRODUCT_COMPONENT_TYPES, 'Gaming Desktop', 'Prebuilt Laptop']} selected={draft.fallbackComponentTypes} onToggle={(value, checked) => toggle('fallbackComponentTypes', value, checked)} /><RuleChecks label="Fallback Value Tiers" options={PRODUCT_VALUE_TIERS} selected={draft.fallbackValueTiers} onToggle={(value, checked) => toggle('fallbackValueTiers', value, checked)} /><label className="flex items-center gap-3 text-sm font-bold"><input checked={draft.enabled} className="size-4 accent-violet-500" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} type="checkbox" />Rule enabled</label><label className="flex items-center gap-3 text-sm font-bold"><input checked={draft.collapsedByDefault} className="size-4 accent-violet-500" onChange={(event) => setDraft({ ...draft, collapsedByDefault: event.target.checked })} type="checkbox" />Collapsed by default</label><button className={primaryButton} disabled={busy || !draft.title.trim() || !draft.description.trim()} type="submit">{busy ? 'Saving…' : 'Save Rule'}</button></form>;
+}
+
+function RuleChecks({ label, options, selected, onToggle }: { label: string; options: readonly string[]; selected: readonly string[]; onToggle: (value: string, checked: boolean) => void }) {
+  return <fieldset><legend className="text-sm font-bold text-slate-300">{label}</legend><div className="mt-2 flex flex-wrap gap-2">{options.map((option) => <label className={`rounded-lg border px-2.5 py-1.5 text-xs ${selected.includes(option) ? 'border-violet-300/40 bg-violet-500/15 text-violet-100' : 'border-white/10 text-slate-400'}`} key={option}><input checked={selected.includes(option)} className="mr-1.5 accent-violet-500" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" />{option}</label>)}</div></fieldset>;
 }
 
 function AssignmentForm({ workspace, currentSectionId, source, busy, fieldErrors, onSave }: { workspace: RecommendationWorkspace; currentSectionId: string; source: RecommendationAssignmentRecord | null; busy: boolean; fieldErrors: Record<string, string>; onSave: (input: AssignmentInput) => void }) {

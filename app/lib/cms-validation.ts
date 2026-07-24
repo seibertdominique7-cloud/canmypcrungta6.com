@@ -24,12 +24,14 @@ export interface ArticleInput extends SeoFields {
   excerpt: string;
   body: string;
   featuredImage: string | null;
+  featuredImagePrompt: string;
   authorName: string;
   status: ContentStatus;
   publishedAt: Date | null;
   scheduledAt: Date | null;
   featured: boolean;
   contentType: ArticleContentType;
+  secondaryKeywords: string[];
   categoryIds: string[];
   primaryCategoryId: string | null;
   tagIds: string[];
@@ -97,9 +99,12 @@ export function validateArticleInput(value: unknown): ValidationResult<ArticleIn
     data: Object.keys(fieldErrors).length ? null : {
       title, slug, excerpt, body,
       featuredImage: optionalUrl(input.featuredImage, 'Featured image', fieldErrors),
+      featuredImagePrompt: text(input.featuredImagePrompt, 2000, false),
       authorName, status,
       publishedAt: dateValue(input.publishedAt), scheduledAt,
-      featured: bool(input.featured), contentType, categoryIds, primaryCategoryId,
+      featured: bool(input.featured), contentType,
+      secondaryKeywords: stringArray(input.secondaryKeywords).slice(0, 20),
+      categoryIds, primaryCategoryId,
       tagIds: stringArray(input.tagIds), relatedArticleIds: stringArray(input.relatedArticleIds),
       ...seo,
     },

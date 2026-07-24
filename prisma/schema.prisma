@@ -20,6 +20,8 @@ model RecommendationScenario {
   sections             RecommendationSection[]
   legacyAffiliateLinks LegacyAffiliateLink[]
   creatorRecommendation CreatorRecommendation?
+  recommendationRules RecommendationRule[]
+  creatorRules       CreatorRecommendationRule[]
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
@@ -41,6 +43,7 @@ model RecommendationSection {
   isCore             Boolean                @default(false)
   products           AffiliateProduct[]
   assignments        RecommendationAssignment[]
+  recommendationRules RecommendationRule[]
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 
@@ -58,15 +61,18 @@ model Product {
   affiliateUrl        String
   defaultPriceText    String                     @default("Check current price")
   platform            String?
+  valueTier           String?
   enabled             Boolean                    @default(true)
   assignments         RecommendationAssignment[]
   creatorAssignments  CreatorProductAssignment[]
+  ruleOverrides       RecommendationRuleOverride[]
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
   @@index([canonicalName])
   @@index([componentType, enabled])
   @@index([retailer, enabled])
+  @@index([valueTier, enabled])
 }
 
 model RecommendationAssignment {
@@ -88,6 +94,58 @@ model RecommendationAssignment {
   @@index([productId, enabled])
 }
 
+model RecommendationRule {
+  id                     String                       @id
+  scenarioId             String
+  scenario               RecommendationScenario       @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  key                    String
+  title                  String
+  description            String
+  enabled                Boolean                      @default(true)
+  displayOrder           Int
+  mode                   String                       @default("AUTOMATIC")
+  allowedComponentTypes  String                       @default("[]")
+  allowedValueTiers      String                       @default("[]")
+  tierPriority           String                       @default("[]")
+  fallbackComponentTypes String                       @default("[]")
+  fallbackValueTiers     String                       @default("[]")
+  maxProducts            Int                          @default(3)
+  sortOrder              String                       @default("TIER_DIVERSITY")
+  layout                 String                       @default("grid")
+  purpose                String                       @default("GENERAL")
+  collapsedByDefault     Boolean                      @default(false)
+  emptyStateTitle        String                       @default("")
+  emptyStateDescription  String                       @default("")
+  emptyCtaLabel          String                       @default("")
+  emptyCtaUrl            String                       @default("")
+  sourceSectionId        String?
+  sourceSection          RecommendationSection?       @relation(fields: [sourceSectionId], references: [id], onDelete: SetNull)
+  source                 String                       @default("LAUNCH_DEFAULT")
+  overrides              RecommendationRuleOverride[]
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+
+  @@unique([scenarioId, key])
+  @@index([scenarioId, enabled, displayOrder])
+  @@index([sourceSectionId])
+}
+
+model RecommendationRuleOverride {
+  id           String             @id @default(cuid())
+  ruleId       String
+  rule         RecommendationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  action       String
+  displayOrder Int                @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([ruleId, productId])
+  @@index([ruleId, action, displayOrder])
+  @@index([productId])
+}
+
 model CreatorRecommendation {
   id                String                         @id @default(cuid())
   scenarioId        String                         @unique
@@ -107,6 +165,28 @@ model CreatorRecommendation {
   updatedAt         DateTime                       @updatedAt
 
   @@index([enabled, updatedAt])
+}
+
+model CreatorRecommendationRule {
+  id                    String                 @id
+  scenarioId            String
+  scenario              RecommendationScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  key                   String
+  title                 String
+  description           String
+  enabled               Boolean                @default(true)
+  displayOrder          Int
+  allowedComponentTypes String                 @default("[]")
+  allowedValueTiers     String                 @default("[]")
+  derivedCategories     String                 @default("[]")
+  tierPriority          String                 @default("[]")
+  maxProducts           Int                    @default(3)
+  source                String                 @default("LAUNCH_DEFAULT")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([scenarioId, key])
+  @@index([scenarioId, enabled, displayOrder])
 }
 
 model CreatorRecommendationGroup {
@@ -284,6 +364,7 @@ model Article {
   excerpt               String           @default("")
   body                  String           @default("")
   featuredImage         String?
+  featuredImagePrompt   String           @default("")
   authorName            String           @default("CanMyPCRunGTA6")
   status                String           @default("draft")
   publishedAt           DateTime?
@@ -302,6 +383,7 @@ model Article {
   robotsIndex           Boolean          @default(true)
   robotsFollow          Boolean          @default(true)
   focusKeyword          String           @default("")
+  secondaryKeywords     String           @default("[]")
   schemaType            String           @default("Article")
   noindex               Boolean          @default(false)
   categories            ArticleCategory[]

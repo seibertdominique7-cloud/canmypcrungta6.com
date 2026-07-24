@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import type {
@@ -14,11 +14,19 @@ import {
   isPassingRecommendationScenario,
 } from '../lib/monetization-policy';
 import { determineRecommendationScenario } from '../lib/recommendation-scenario';
+import { trackRecommendationEvent } from '../lib/recommendation-analytics';
 import { ResultsAd } from './ads/AdPlacements';
 import { RecommendationProductCard } from './RecommendationProductCard';
 
-export function AffiliateRecommendations({ result }: { result: CompatibilityResult }) {
+export function AffiliateRecommendations({
+  result,
+  onProductsLoaded,
+}: {
+  result: CompatibilityResult;
+  onProductsLoaded?: (productIds: string[]) => void;
+}) {
   const scenarioCode = determineRecommendationScenario(result);
+  const trackedScenario = useRef('');
   const [requestState, setRequestState] = useState<{
     scenarioCode: string;
     payload: PublicMonetizationPayload;
@@ -55,6 +63,21 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
               0,
           });
         }
+        if (trackedScenario.current !== scenarioCode) {
+          trackedScenario.current = scenarioCode;
+          trackRecommendationEvent('recommendation_scenario_viewed', {
+            scenario: scenarioCode,
+          });
+        }
+        onProductsLoaded?.(
+          Array.from(
+            new Set(
+              (payload?.sections ?? []).flatMap((section) =>
+                section.products.map((product) => product.productId ?? product.id),
+              ),
+            ),
+          ),
+        );
         setRequestState({ scenarioCode, payload, loaded: true, error: null });
       })
       .catch((error: unknown) => {
@@ -69,7 +92,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
       });
 
     return () => controller.abort();
-  }, [result, scenarioCode]);
+  }, [onProductsLoaded, result, scenarioCode]);
 
   const isCurrentResponse = requestState.scenarioCode === scenarioCode;
   const payload = isCurrentResponse ? requestState.payload : null;
@@ -97,6 +120,9 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
   const generalSections = displaySections.filter(
     ({ section }) => section.purpose === 'GENERAL',
   );
+  const guidanceSections = (payload?.sections ?? []).filter(
+    (section) => section.purpose === 'GUIDANCE',
+  );
   const prebuiltSections = (payload?.sections ?? []).filter(
     (section) => section.purpose === 'PREBUILT',
   );
@@ -105,6 +131,13 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
     : [];
   const [primarySection, ...secondaryGeneralSections] = generalSections;
   const monetizedBlocks: Array<{ key: string; node: ReactNode }> = [];
+
+  for (const section of guidanceSections) {
+    monetizedBlocks.push({
+      key: section.id,
+      node: <GuidanceRecommendationSection scenarioCode={scenarioCode} section={section} />,
+    });
+  }
 
   if (primarySection) {
     monetizedBlocks.push({
@@ -115,6 +148,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
           initialProductLimit={primarySection.initialProductLimit}
           initiallyOpen={primarySection.initiallyOpen}
           section={primarySection.section}
+          scenarioCode={scenarioCode}
         />
       ),
     });
@@ -123,7 +157,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
   if (prebuiltSections.length > 0) {
     monetizedBlocks.push({
       key: 'complete-gaming-pcs',
-      node: <PrebuiltRecommendationSection sections={prebuiltSections} />,
+      node: <PrebuiltRecommendationSection scenarioCode={scenarioCode} sections={prebuiltSections} />,
     });
   }
 
@@ -142,6 +176,7 @@ export function AffiliateRecommendations({ result }: { result: CompatibilityResu
           initialProductLimit={sectionState.initialProductLimit}
           initiallyOpen={sectionState.initiallyOpen}
           section={sectionState.section}
+          scenarioCode={scenarioCode}
         />
       ),
     });
@@ -254,11 +289,13 @@ function RecommendationSection({
   initiallyOpen,
   initialProductLimit,
   description,
+  scenarioCode,
 }: {
   section: PublicRecommendationSection;
   initiallyOpen: boolean;
   initialProductLimit: number;
   description?: string;
+  scenarioCode: string;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const [showAll, setShowAll] = useState(false);
@@ -271,9 +308,26 @@ function RecommendationSection({
       : section.products
     : [];
   const hasMore = open && productsToRender.length < section.products.length;
+  const sectionRef = useRef<HTMLElement>(null);
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    if (!sectionRef.current || tracked.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting) || tracked.current) return;
+      tracked.current = true;
+      trackRecommendationEvent('recommendation_section_viewed', {
+        scenario: scenarioCode,
+        section: section.title,
+      });
+      observer.disconnect();
+    }, { threshold: 0.2 });
+    observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, [scenarioCode, section.title]);
 
   return (
-    <section className="theme-glass-card overflow-hidden rounded-3xl">
+    <section className="theme-glass-card overflow-hidden rounded-3xl" ref={sectionRef}>
       <button
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-fuchsia-400/[0.045] sm:p-6"
@@ -298,7 +352,16 @@ function RecommendationSection({
         <div className="border-t border-white/10 p-4 sm:p-5 sm:pt-6">
           <div className={layoutClass(section.layout, productsToRender.length)}>
             {productsToRender.map((product) => (
-              <RecommendationProductCard key={product.id} product={product} />
+              <RecommendationProductCard
+                key={product.id}
+                onAction={() => trackRecommendationEvent('recommendation_product_clicked', {
+                  scenario: scenarioCode,
+                  section: section.title,
+                  productId: product.productId ?? product.id,
+                  productTitle: product.title,
+                })}
+                product={product}
+              />
             ))}
           </div>
           {hasMore ? (
@@ -318,8 +381,10 @@ function RecommendationSection({
 
 function PrebuiltRecommendationSection({
   sections,
+  scenarioCode,
 }: {
   sections: PublicRecommendationSection[];
+  scenarioCode: string;
 }) {
   const products = sections
     .flatMap((section) =>
@@ -347,6 +412,12 @@ function PrebuiltRecommendationSection({
             categoryLabel={categoryLabel}
             compact
             key={product.id}
+            onAction={() => trackRecommendationEvent('recommendation_prebuilt_clicked', {
+              scenario: scenarioCode,
+              section: categoryLabel,
+              productId: product.productId ?? product.id,
+              productTitle: product.title,
+            })}
             product={product}
           />
         ))}
@@ -385,9 +456,43 @@ function GamePurchaseRecommendationSection({
 function AffiliateDisclosure() {
   return (
     <p className="rounded-xl border border-violet-200/10 bg-slate-950/35 px-3 py-2 text-xs leading-5 text-slate-300">
-      Disclosure: We may earn a commission when you purchase through links on this page, at no
-      additional cost to you.
+      Some product links are affiliate links. We may earn a commission from qualifying
+      purchases at no additional cost to you.
     </p>
+  );
+}
+
+function GuidanceRecommendationSection({
+  section,
+  scenarioCode,
+}: {
+  section: PublicRecommendationSection;
+  scenarioCode: string;
+}) {
+  return (
+    <aside className="theme-glass-card rounded-2xl p-4 sm:p-5">
+      <p className="theme-kicker text-xs font-black uppercase tracking-[0.17em]">
+        Confirm your hardware
+      </p>
+      <h2 className="mt-1 text-xl font-black text-white">
+        {section.emptyStateTitle || section.title}
+      </h2>
+      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+        {section.emptyStateDescription || section.description}
+      </p>
+      {section.ctaLabel && section.ctaUrl ? (
+        <Link
+          className="theme-primary-button mt-4 inline-flex rounded-xl px-4 py-2.5 text-sm font-black"
+          href={section.ctaUrl}
+          onClick={() => trackRecommendationEvent(
+            'recommendation_manual_spec_cta_clicked',
+            { scenario: scenarioCode, section: section.title },
+          )}
+        >
+          {section.ctaLabel} &rarr;
+        </Link>
+      ) : null}
+    </aside>
   );
 }
 

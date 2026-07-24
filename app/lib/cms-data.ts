@@ -656,6 +656,7 @@ function articleFields(input: ArticleInput, publishedAt: Date | null) {
     excerpt: input.excerpt,
     body: input.body,
     featuredImage: input.featuredImage,
+    featuredImagePrompt: input.featuredImagePrompt,
     authorName: input.authorName,
     status: input.status,
     publishedAt,
@@ -674,6 +675,7 @@ function articleFields(input: ArticleInput, publishedAt: Date | null) {
     robotsIndex: input.robotsIndex,
     robotsFollow: input.robotsFollow,
     focusKeyword: input.focusKeyword,
+    secondaryKeywords: JSON.stringify(input.secondaryKeywords),
     schemaType: input.schemaType,
     noindex: input.noindex,
   };
@@ -837,6 +839,7 @@ function serializeArticle(article: ArticleWithRelations, revisions: Prisma.Conte
     ...article,
     status: article.status as ArticleRecord['status'],
     contentType: article.contentType as ArticleRecord['contentType'],
+    secondaryKeywords: parseStoredStringArray(article.secondaryKeywords),
     categories: article.categories.map((item) => ({ ...serializeCategory(item.category), isPrimary: item.isPrimary })),
     tags: article.tags.map((item) => serializeTag(item.tag)),
     relatedArticleIds: article.relatedArticles.map((item) => item.relatedArticleId),
@@ -885,7 +888,7 @@ function serializeRedirect(item: Prisma.RedirectGetPayload<Record<string, never>
 function isEverPublished(status: string, publishedAt: Date | null) { return status === 'published' || Boolean(publishedAt); }
 
 function toArticleInput(source: ArticleWithRelations): ArticleInput {
-  return { ...source, status: source.status as ArticleInput['status'], contentType: source.contentType as ArticleInput['contentType'], categoryIds: source.categories.map((item) => item.categoryId), primaryCategoryId: source.categories.find((item) => item.isPrimary)?.categoryId ?? null, tagIds: source.tags.map((item) => item.tagId), relatedArticleIds: source.relatedArticles.map((item) => item.relatedArticleId) };
+  return { ...source, secondaryKeywords: parseStoredStringArray(source.secondaryKeywords), status: source.status as ArticleInput['status'], contentType: source.contentType as ArticleInput['contentType'], categoryIds: source.categories.map((item) => item.categoryId), primaryCategoryId: source.categories.find((item) => item.isPrimary)?.categoryId ?? null, tagIds: source.tags.map((item) => item.tagId), relatedArticleIds: source.relatedArticles.map((item) => item.relatedArticleId) };
 }
 
 function toPageInput(source: PageWithFaqs): PageInput {
@@ -896,4 +899,15 @@ function toPageInput(source: PageWithFaqs): PageInput {
     footerGroup: source.footerGroup as PageInput['footerGroup'],
     faqEntries: source.faqEntries.map((entry) => ({ ...entry, id: entry.id })),
   };
+}
+
+function parseStoredStringArray(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string').slice(0, 20)
+      : [];
+  } catch {
+    return [];
+  }
 }

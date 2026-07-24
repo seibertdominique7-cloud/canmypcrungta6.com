@@ -4,6 +4,11 @@ import {
   isSafeCreatorDestination,
   validateCreatorRecommendationInput,
 } from './creator-recommendation-validation';
+import { getCreatorDestinationWarning } from './creator-cta-destinations';
+import {
+  CREATOR_FALLBACK,
+  CREATOR_SCENARIO_DEFAULTS,
+} from '../data/creator-recommendations';
 
 const validInput = {
   scenarioId: 'scenario-1',
@@ -13,9 +18,9 @@ const validInput = {
   description: 'Start with the upgrades that solve the biggest bottleneck.',
   warningText: '',
   primaryCtaLabel: 'Build My Streaming Setup',
-  primaryCtaUrl: '/articles',
-  secondaryCtaLabel: '',
-  secondaryCtaUrl: '',
+  primaryCtaUrl: '/creator-setup-builder',
+  secondaryCtaLabel: 'View Creator Setup Guide',
+  secondaryCtaUrl: '/creator-setup-guide',
   groups: [
     {
       title: 'Audio That Viewers Notice',
@@ -24,7 +29,7 @@ const validInput = {
       productIds: ['microphone-1', 'headset-1'],
     },
   ],
-  guides: [{ label: 'Creator guide', url: '/articles/creator-guide', enabled: true }],
+  guides: [{ label: 'Creator guide', url: '/creator-setup-guide', enabled: true }],
 };
 
 describe('creator recommendation validation', () => {
@@ -49,6 +54,7 @@ describe('creator recommendation validation', () => {
     const result = validateCreatorRecommendationInput({
       ...validInput,
       secondaryCtaLabel: 'View guide',
+      secondaryCtaUrl: '',
     });
 
     expect(result.data).toBeNull();
@@ -61,5 +67,22 @@ describe('creator recommendation validation', () => {
     expect(isSafeCreatorDestination('https://example.com/creator')).toBe(true);
     expect(isSafeCreatorDestination('/articles/creator')).toBe(true);
     expect(isSafeCreatorDestination('#creator-products')).toBe(true);
+  });
+
+  it('uses real creator routes for every default CTA', () => {
+    expect(CREATOR_FALLBACK.primaryCtaUrl).toBe('/creator-setup-builder');
+    expect(CREATOR_FALLBACK.secondaryCtaUrl).toBe('/creator-setup-guide');
+
+    for (const copy of Object.values(CREATOR_SCENARIO_DEFAULTS)) {
+      expect(copy.primaryCtaUrl).toBe('/creator-setup-builder');
+      expect(copy.secondaryCtaUrl).toBe('/creator-setup-guide');
+    }
+  });
+
+  it('warns about general article and unverified destinations', () => {
+    expect(getCreatorDestinationWarning('/creator-setup-builder')).toBe('');
+    expect(getCreatorDestinationWarning('/creator-setup-guide')).toBe('');
+    expect(getCreatorDestinationWarning('/articles')).toContain('general article index');
+    expect(getCreatorDestinationWarning('/missing-creator-page')).toContain('not a verified');
   });
 });

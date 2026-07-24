@@ -9,9 +9,21 @@ import type { PublicCreatorRecommendationPayload } from '../lib/creator-recommen
 import { determineRecommendationScenario } from '../lib/recommendation-scenario';
 import { RecommendationProductCard } from './RecommendationProductCard';
 
-export function CreatorRecommendations({ result }: { result: CompatibilityResult }) {
+export function CreatorRecommendations({
+  result,
+  excludeProductIds = [],
+}: {
+  result: CompatibilityResult;
+  excludeProductIds?: string[];
+}) {
   const scenarioCode = determineRecommendationScenario(result);
-  const [loadedPayload, setLoadedPayload] = useState<PublicCreatorRecommendationPayload | null>(null);
+  const exclusionKey = [...excludeProductIds].sort().join(',');
+  const requestKey = `${scenarioCode}:${exclusionKey}`;
+  const [loadedState, setLoadedState] = useState<{
+    key: string;
+    payload: PublicCreatorRecommendationPayload | null;
+  }>({ key: '', payload: null });
+  const loadedPayload = loadedState.key === requestKey ? loadedState.payload : null;
   const payload =
     loadedPayload?.scenarioCode === scenarioCode
       ? loadedPayload
@@ -19,7 +31,9 @@ export function CreatorRecommendations({ result }: { result: CompatibilityResult
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`/api/creator-recommendations?scenario=${encodeURIComponent(scenarioCode)}`, {
+    const params = new URLSearchParams({ scenario: scenarioCode });
+    if (exclusionKey) params.set('exclude', exclusionKey);
+    void fetch(`/api/creator-recommendations?${params.toString()}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
@@ -27,15 +41,17 @@ export function CreatorRecommendations({ result }: { result: CompatibilityResult
         if (!response.ok) throw new Error('Creator recommendations could not be loaded.');
         return (await response.json()) as PublicCreatorRecommendationPayload;
       })
-      .then(setLoadedPayload)
+      .then((responsePayload) => {
+        setLoadedState({ key: requestKey, payload: responsePayload });
+      })
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          setLoadedPayload(null);
+          setLoadedState({ key: requestKey, payload: null });
         }
       });
 
     return () => controller.abort();
-  }, [scenarioCode]);
+  }, [exclusionKey, requestKey, scenarioCode]);
 
   return <CreatorRecommendationSection payload={payload} />;
 }

@@ -5,12 +5,15 @@ import type {
   GamePurchaseLink,
   Product,
   RecommendationAssignment,
+  RecommendationRule,
+  RecommendationRuleOverride,
   RecommendationScenario,
   RecommendationSection,
 } from '../../generated/prisma/client';
 import type {
   AffiliateProductRecord,
   GamePurchaseLinkRecord,
+  ProductValueTier,
   PublicMonetizationPayload,
   RecommendationScenarioRecord,
   RecommendationSectionRecord,
@@ -24,10 +27,23 @@ import type {
 import { isPublicHttpsUrl } from './affiliate-validation';
 import { AdminDataError } from './admin-data-error';
 import { prisma } from './prisma';
+import { selectRuleProducts } from './recommendation-rules-data';
 
 type SectionWithProducts = RecommendationSection & { products: AffiliateProduct[] };
 type ScenarioWithSections = RecommendationScenario & {
   sections: SectionWithProducts[];
+};
+type PublicRuleScenario = RecommendationScenario & {
+  sections: Array<
+    RecommendationSection & {
+      assignments: Array<RecommendationAssignment & { product: Product }>;
+    }
+  >;
+  recommendationRules: Array<
+    RecommendationRule & {
+      overrides: Array<RecommendationRuleOverride & { product: Product }>;
+    }
+  >;
 };
 
 export async function getAdminScenarios(): Promise<RecommendationScenarioRecord[]> {
@@ -88,20 +104,27 @@ export async function getPublicRecommendations(code: string, requestedLimit?: nu
 export async function getPublicMonetization(
   code: string,
 ): Promise<PublicMonetizationPayload> {
-  const scenario = await prisma.recommendationScenario.findFirst({
-    where: { code, groupType: 'SCENARIO' },
-    include: {
-      sections: {
-        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-        include: {
-          assignments: {
-            orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-            include: { product: true },
+  const [scenario, catalogProducts] = await Promise.all([
+    prisma.recommendationScenario.findFirst({
+      where: { code, groupType: 'SCENARIO' },
+      include: {
+        sections: {
+          orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+          include: {
+            assignments: {
+              orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+              include: { product: true },
+            },
           },
         },
+        recommendationRules: {
+          orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+          include: { overrides: { include: { product: true } } },
+        },
       },
-    },
-  });
+    }),
+    prisma.product.findMany(),
+  ]);
 
   if (!scenario) {
     if (process.env.NODE_ENV !== 'production') {
@@ -113,6 +136,10 @@ export async function getPublicMonetization(
       });
     }
     return null;
+  }
+
+  if (scenario.recommendationRules.length > 0) {
+    return buildRuleBasedMonetization(scenario, catalogProducts, code);
   }
 
   const matchingSections = scenario.sections;
@@ -196,6 +223,180 @@ export async function getPublicMonetization(
     sections: scenario.enabled ? sections : [],
     ...(process.env.NODE_ENV !== 'production' ? { debug } : {}),
   };
+}
+
+function buildRuleBasedMonetization(
+  scenario: PublicRuleScenario,
+  products: Product[],
+  code: string,
+): PublicMonetizationPayload {
+  const assignments = scenario.sections.flatMap((section) => section.assignments);
+  const enabledRules = scenario.recommendationRules.filter((rule) => rule.enabled);
+  const seenProductIds = new Set<string>();
+  const fallbacksUsed = new Set<string>();
+  const missingComponentTypes = new Set<string>();
+  const sectionsWithoutEnabledProducts: string[] = [];
+  let productsFound = 0;
+
+  const sections = enabledRules.flatMap((rule) => {
+    const selection = selectRuleProducts(products, rule, assignments, seenProductIds);
+    const assignmentByProductId = new Map(
+      assignments
+        .filter(
+          (assignment) =>
+            assignment.sectionId === rule.sourceSectionId && assignment.enabled,
+        )
+        .map((assignment) => [assignment.productId, assignment]),
+    );
+    const publicProducts = selection.products.map((selected, index) => {
+      const assignment =
+        selected.selectionSource === 'MANUAL'
+          ? assignmentByProductId.get(selected.product.id)
+          : undefined;
+      return assignment
+        ? serializePublicAssignment(assignment)
+        : serializeAutomaticProduct(selected.product, rule.id, index);
+    });
+    productsFound += publicProducts.length;
+    for (const selected of selection.products) {
+      if (selected.selectionSource !== 'MANUAL') seenProductIds.add(selected.product.id);
+    }
+    for (const fallback of selection.fallbackUsed) fallbacksUsed.add(fallback);
+    for (const componentType of selection.missingComponentTypes) {
+      missingComponentTypes.add(componentType);
+    }
+
+    const hasGuidance = Boolean(rule.emptyCtaLabel && rule.emptyCtaUrl);
+    if (publicProducts.length === 0 && !hasGuidance) {
+      sectionsWithoutEnabledProducts.push(rule.title);
+      return [];
+    }
+
+    return [{
+      id: rule.id,
+      title: rule.title,
+      description: rule.description,
+      maxProducts: Math.max(0, rule.maxProducts),
+      collapsedByDefault: rule.collapsedByDefault,
+      layout: normalizeRuleLayout(rule.layout),
+      purpose: normalizeRulePurpose(rule.purpose),
+      products: publicProducts,
+      selection: {
+        mode: rule.mode === 'MANUAL' ? 'MANUAL' as const : 'AUTOMATIC' as const,
+        source:
+          rule.source === 'MANUAL' ? 'MANUAL' as const : 'LAUNCH_DEFAULT' as const,
+        eligibleProducts: selection.eligibleProducts,
+        fallbackUsed: selection.fallbackUsed,
+        selectedValueTiers: unique(
+          selection.products.flatMap((selected) =>
+            selected.product.valueTier
+              ? [selected.product.valueTier as ProductValueTier]
+              : [],
+          ),
+        ),
+      },
+      emptyStateTitle: rule.emptyStateTitle,
+      emptyStateDescription: rule.emptyStateDescription,
+      ctaLabel: rule.emptyCtaLabel,
+      ctaUrl: rule.emptyCtaUrl,
+    }];
+  });
+  const disabledSections = scenario.recommendationRules
+    .filter((rule) => !rule.enabled)
+    .map((rule) => ({ title: rule.title, enabledProducts: 0 }));
+  const assignedProducts = assignments.filter(
+    (assignment) => assignment.enabled && assignment.product.enabled,
+  );
+  const productsRejectedByUrl = assignedProducts
+    .filter((assignment) => !isPublicHttpsUrl(assignment.product.affiliateUrl))
+    .map((assignment) => assignment.product.title);
+  const debug = {
+    detectedScenario: code,
+    databaseScenarioCode: scenario.code,
+    scenarioEnabled: scenario.enabled,
+    sectionsFound: enabledRules.length,
+    productsFound,
+    renderableProductsFound: sections.reduce(
+      (total, section) => total + section.products.length,
+      0,
+    ),
+    disabledSections,
+    sectionsWithoutEnabledProducts,
+    productsRejectedByUrl,
+    rulesFound: scenario.recommendationRules.length,
+    fallbacksUsed: Array.from(fallbacksUsed),
+    missingComponentTypes: Array.from(missingComponentTypes),
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.info(`[recommendations] Detected scenario: ${code}`, debug);
+  }
+
+  return {
+    scenario: {
+      code: scenario.code,
+      resultHeading: scenario.resultHeading,
+      resultDescription: scenario.resultDescription,
+    },
+    sections: scenario.enabled ? sections : [],
+    ...(process.env.NODE_ENV !== 'production' ? { debug } : {}),
+  };
+}
+
+function serializeAutomaticProduct(
+  product: Product,
+  sectionId: string,
+  index: number,
+): AffiliateProductRecord {
+  return {
+    id: `automatic-${sectionId}-${product.id}`,
+    productId: product.id,
+    sectionId,
+    title: product.title,
+    retailer: product.retailer as AffiliateProductRecord['retailer'],
+    affiliateUrl: product.affiliateUrl,
+    imageUrl: product.imageUrl,
+    priceText: product.defaultPriceText,
+    badge: badgeForValueTier(product.valueTier),
+    shortDescription: product.shortDescription,
+    buttonText:
+      product.retailer === 'Other' ? 'Check Current Price' : `View on ${product.retailer}`,
+    componentType: product.componentType as AffiliateProductRecord['componentType'],
+    platform: product.platform as AffiliateProductRecord['platform'],
+    enabled: product.enabled,
+    displayOrder: (index + 1) * 10,
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
+  };
+}
+
+function badgeForValueTier(valueTier: string | null): AffiliateProductRecord['badge'] {
+  if (valueTier === 'Budget' || valueTier === 'Minimum') return 'Budget Pick';
+  if (valueTier === 'Best Value') return 'Best Value';
+  if (valueTier === 'Performance') return 'Performance Pick';
+  if (valueTier === 'Premium') return 'Premium Pick';
+  if (valueTier === 'Recommended') return 'Recommended';
+  return 'None';
+}
+
+function normalizeRuleLayout(value: string): RecommendationSectionRecord['layout'] {
+  if (value === 'horizontal' || value === 'featured') return value;
+  return 'grid';
+}
+
+function normalizeRulePurpose(value: string): RecommendationSectionRecord['purpose'] {
+  if (
+    value === 'PREBUILT' ||
+    value === 'GAME_PURCHASE' ||
+    value === 'GUIDANCE'
+  ) {
+    return value;
+  }
+  return 'GENERAL';
+}
+
+function unique<T>(values: readonly T[]) {
+  return Array.from(new Set(values));
 }
 
 export async function createScenario(input: ScenarioInput) {

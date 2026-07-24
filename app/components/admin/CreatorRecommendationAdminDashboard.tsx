@@ -4,6 +4,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 
 import {
   CREATOR_SCENARIO_DEFAULTS,
+  CREATOR_SETUP_BUILDER_PATH,
+  CREATOR_SETUP_GUIDE_PATH,
   CREATOR_TEMPLATES,
   type CreatorTemplate,
 } from '../../data/creator-recommendations';
@@ -14,6 +16,7 @@ import type {
   CreatorRecommendationWorkspace,
   PublicCreatorRecommendationPayload,
 } from '../../lib/creator-recommendation-types';
+import { getCreatorDestinationWarning } from '../../lib/creator-cta-destinations';
 import { CreatorRecommendationSection } from '../CreatorRecommendations';
 import { AdminHeader } from './AdminHeader';
 import { CatalogProductPicker } from './CatalogProductPicker';
@@ -42,6 +45,7 @@ interface WorkspaceResponse {
   error?: string;
   fieldErrors?: Record<string, string>;
   message?: string;
+  warnings?: Array<{ field: string; message: string }>;
   workspace?: CreatorRecommendationWorkspace;
 }
 
@@ -62,6 +66,7 @@ export function CreatorRecommendationAdminDashboard({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const selectedScenario =
     workspace.scenarios.find((scenario) => scenario.id === selectedScenarioId) ??
@@ -81,6 +86,7 @@ export function CreatorRecommendationAdminDashboard({
     if (scenario) setDraft(draftFromScenario(scenario));
     setNotice('');
     setError('');
+    setWarnings([]);
     setFieldErrors({});
   };
 
@@ -88,6 +94,7 @@ export function CreatorRecommendationAdminDashboard({
     setBusy(true);
     setNotice('');
     setError('');
+    setWarnings([]);
     setFieldErrors({});
     try {
       const response = await fetch('/api/admin/creator-recommendations', {
@@ -108,6 +115,9 @@ export function CreatorRecommendationAdminDashboard({
         if (refreshed) setDraft(draftFromScenario(refreshed));
       }
       setNotice(payload.message ?? 'Creator recommendation saved.');
+      setWarnings(
+        (payload.warnings ?? []).map((warning) => `${warning.field}: ${warning.message}`),
+      );
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -173,6 +183,7 @@ export function CreatorRecommendationAdminDashboard({
             </button>
           </div>
           {(notice || error) ? <StatusMessage error={Boolean(error)}>{error || notice}</StatusMessage> : null}
+          {warnings.length > 0 ? <WarningMessage warnings={warnings} /> : null}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="self-start rounded-2xl border border-white/10 bg-black/20 p-4 lg:sticky lg:top-4">
@@ -225,13 +236,13 @@ export function CreatorRecommendationAdminDashboard({
               </section>
 
               <section className={panelClass}>
-                <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">Guide and article links</h2><p className="mt-1 text-xs text-slate-500">Use internal paths or public HTTPS links.</p></div><button className={secondaryButton} onClick={() => setDraft((current) => ({ ...current, guides: [...current.guides, { localId: `guide-${Date.now()}`, label: 'Creator Setup Guide', url: '/articles', enabled: true }] }))} type="button">Add Guide Link</button></div>
-                <div className="mt-4 grid gap-3">{draft.guides.map((guide, index) => <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 md:grid-cols-[auto_1fr_1.4fr_auto] md:items-center" key={guide.localId}><input aria-label={`Enable ${guide.label || 'guide link'}`} checked={guide.enabled} className="size-4 accent-violet-500" onChange={(event) => setDraft((current) => ({ ...current, guides: current.guides.map((item) => item.localId === guide.localId ? { ...item, enabled: event.target.checked } : item) }))} type="checkbox" /><input aria-label="Guide label" className={inputClass} onChange={(event) => setDraft((current) => ({ ...current, guides: current.guides.map((item) => item.localId === guide.localId ? { ...item, label: event.target.value } : item) }))} placeholder="Guide label" value={guide.label} /><input aria-label="Guide URL" className={inputClass} onChange={(event) => setDraft((current) => ({ ...current, guides: current.guides.map((item) => item.localId === guide.localId ? { ...item, url: event.target.value } : item) }))} placeholder="/articles/creator-guide" value={guide.url} /><div className="flex gap-1"><button aria-label="Move guide up" className={smallButton} disabled={index === 0} onClick={() => setDraft((current) => ({ ...current, guides: moveItem(current.guides, index, -1) }))} type="button">↑</button><button aria-label="Move guide down" className={smallButton} disabled={index === draft.guides.length - 1} onClick={() => setDraft((current) => ({ ...current, guides: moveItem(current.guides, index, 1) }))} type="button">↓</button><button className={dangerButton} onClick={() => setDraft((current) => ({ ...current, guides: current.guides.filter((item) => item.localId !== guide.localId) }))} type="button">Remove</button></div>{fieldErrors[`guides.${index}.url`] ? <span className="text-xs text-red-300 md:col-start-3">{fieldErrors[`guides.${index}.url`]}</span> : null}</div>)}</div>
+                <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">Guide and article links</h2><p className="mt-1 text-xs text-slate-500">Use internal paths or public HTTPS links.</p></div><button className={secondaryButton} onClick={() => setDraft((current) => ({ ...current, guides: [...current.guides, { localId: `guide-${Date.now()}`, label: 'Creator Setup Guide', url: CREATOR_SETUP_GUIDE_PATH, enabled: true }] }))} type="button">Add Guide Link</button></div>
+                <div className="mt-4 grid gap-3">{draft.guides.map((guide, index) => <GuideEditor error={fieldErrors[`guides.${index}.url`]} guide={guide} index={index} key={guide.localId} onChange={(change) => setDraft((current) => ({ ...current, guides: current.guides.map((item) => item.localId === guide.localId ? { ...item, ...change } : item) }))} onMove={(direction) => setDraft((current) => ({ ...current, guides: moveItem(current.guides, index, direction) }))} onRemove={() => setDraft((current) => ({ ...current, guides: current.guides.filter((item) => item.localId !== guide.localId) }))} total={draft.guides.length} />)}</div>
               </section>
 
               <section className={panelClass}>
                 <h2 className="text-xl font-black">Calls to action</h2>
-                <div className="mt-4 grid gap-4 md:grid-cols-2"><Field error={fieldErrors.primaryCtaLabel} label="Primary CTA label"><input className={inputClass} onChange={(event) => setDraft({ ...draft, primaryCtaLabel: event.target.value })} value={draft.primaryCtaLabel} /></Field><Field error={fieldErrors.primaryCtaUrl} label="Primary CTA URL"><input className={inputClass} onChange={(event) => setDraft({ ...draft, primaryCtaUrl: event.target.value })} value={draft.primaryCtaUrl} /></Field><Field error={fieldErrors.secondaryCtaLabel} label="Secondary CTA label (optional)"><input className={inputClass} onChange={(event) => setDraft({ ...draft, secondaryCtaLabel: event.target.value })} value={draft.secondaryCtaLabel} /></Field><Field error={fieldErrors.secondaryCtaUrl} label="Secondary CTA URL (optional)"><input className={inputClass} onChange={(event) => setDraft({ ...draft, secondaryCtaUrl: event.target.value })} value={draft.secondaryCtaUrl} /></Field></div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2"><Field error={fieldErrors.primaryCtaLabel} label="Primary CTA label"><input className={inputClass} onChange={(event) => setDraft({ ...draft, primaryCtaLabel: event.target.value })} value={draft.primaryCtaLabel} /></Field><Field error={fieldErrors.primaryCtaUrl} label="Primary CTA URL" warning={getCreatorDestinationWarning(draft.primaryCtaUrl)}><input className={inputClass} onChange={(event) => setDraft({ ...draft, primaryCtaUrl: event.target.value })} value={draft.primaryCtaUrl} /></Field><Field error={fieldErrors.secondaryCtaLabel} label="Secondary CTA label (optional)"><input className={inputClass} onChange={(event) => setDraft({ ...draft, secondaryCtaLabel: event.target.value })} value={draft.secondaryCtaLabel} /></Field><Field error={fieldErrors.secondaryCtaUrl} label="Secondary CTA URL (optional)" warning={draft.secondaryCtaLabel || draft.secondaryCtaUrl ? getCreatorDestinationWarning(draft.secondaryCtaUrl) : ''}><input className={inputClass} onChange={(event) => setDraft({ ...draft, secondaryCtaUrl: event.target.value })} value={draft.secondaryCtaUrl} /></Field></div>
               </section>
 
               {previewPayload ? <section className={`${panelClass} overflow-hidden p-0`}><div className="border-b border-white/10 px-4 py-3"><p className="text-xs font-black uppercase tracking-[0.15em] text-violet-300">Live public preview</p><p className="mt-1 text-xs text-slate-500">Disabled or invalid products are omitted, matching public behavior.</p></div><CreatorRecommendationSection payload={previewPayload} preview /></section> : null}
@@ -254,6 +265,11 @@ function AssignedProductRow({ product, index, total, onMove, onRemove }: { produ
   return <div className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/30 text-[10px] font-black text-slate-600">{product.imageUrl ? <span aria-label="Product image configured" className="text-emerald-300">IMG</span> : product.componentType.slice(0, 3)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{product.title}</span><span className="block text-xs text-slate-500">{product.componentType} · {product.retailer} · {product.enabled ? 'Enabled' : 'Disabled'}</span></span><button aria-label="Move product up" className={smallButton} disabled={index === 0} onClick={() => onMove(-1)} type="button">↑</button><button aria-label="Move product down" className={smallButton} disabled={index === total - 1} onClick={() => onMove(1)} type="button">↓</button><button className={dangerButton} onClick={onRemove} type="button">Remove</button></div>;
 }
 
+function GuideEditor({ guide, index, total, error, onChange, onMove, onRemove }: { guide: DraftGuide; index: number; total: number; error?: string; onChange: (change: Partial<DraftGuide>) => void; onMove: (direction: -1 | 1) => void; onRemove: () => void }) {
+  const warning = guide.enabled ? getCreatorDestinationWarning(guide.url) : '';
+  return <div className="grid gap-2 rounded-xl border border-white/10 bg-black/20 p-3 md:grid-cols-[auto_1fr_1.4fr_auto] md:items-center"><input aria-label={`Enable ${guide.label || 'guide link'}`} checked={guide.enabled} className="size-4 accent-violet-500" onChange={(event) => onChange({ enabled: event.target.checked })} type="checkbox" /><input aria-label="Guide label" className={inputClass} onChange={(event) => onChange({ label: event.target.value })} placeholder="Guide label" value={guide.label} /><input aria-label="Guide URL" className={inputClass} onChange={(event) => onChange({ url: event.target.value })} placeholder={CREATOR_SETUP_GUIDE_PATH} value={guide.url} /><div className="flex gap-1"><button aria-label="Move guide up" className={smallButton} disabled={index === 0} onClick={() => onMove(-1)} type="button">↑</button><button aria-label="Move guide down" className={smallButton} disabled={index === total - 1} onClick={() => onMove(1)} type="button">↓</button><button className={dangerButton} onClick={onRemove} type="button">Remove</button></div>{error ? <span className="text-xs text-red-300 md:col-start-3">{error}</span> : warning ? <span className="text-xs text-amber-300 md:col-start-3">{warning}</span> : null}</div>;
+}
+
 function draftFromScenario(scenario: CreatorRecommendationWorkspace['scenarios'][number]): CreatorDraft {
   const record = scenario.creatorRecommendation;
   if (record) return { scenarioId: scenario.id, enabled: record.enabled, headline: record.headline, subheadline: record.subheadline, description: record.description, warningText: record.warningText, primaryCtaLabel: record.primaryCtaLabel, primaryCtaUrl: record.primaryCtaUrl, secondaryCtaLabel: record.secondaryCtaLabel, secondaryCtaUrl: record.secondaryCtaUrl, groups: record.groups.map((group) => ({ localId: group.id, title: group.title, description: group.description, enabled: group.enabled, productIds: group.assignments.map((assignment) => assignment.productId) })), guides: record.guides.map((guide) => ({ localId: guide.id, label: guide.label, url: guide.url, enabled: guide.enabled })) };
@@ -267,14 +283,15 @@ function hasMeaningfulDraft(draft: CreatorDraft) { return Boolean(draft.headline
 function moveItem<T>(items: T[], index: number, direction: -1 | 1) { const destination = index + direction; if (destination < 0 || destination >= items.length) return items; const output = [...items]; [output[index], output[destination]] = [output[destination], output[index]]; return output; }
 
 function toPreviewPayload(code: CoreRecommendationScenarioCode, draft: CreatorDraft, products: Map<string, ProductRecord>): PublicCreatorRecommendationPayload {
-  return { scenarioCode: code, source: 'custom', headline: draft.headline || 'Creator headline', subheadline: draft.subheadline || 'Creator subheadline', description: draft.description || 'Creator description', warningText: draft.warningText, primaryCtaLabel: draft.primaryCtaLabel || 'Build My Streaming Setup', primaryCtaUrl: draft.primaryCtaUrl || '/articles', secondaryCtaLabel: draft.secondaryCtaLabel, secondaryCtaUrl: draft.secondaryCtaUrl, groups: draft.groups.filter((group) => group.enabled).map((group) => ({ id: group.localId, title: group.title || 'Creator product group', description: group.description, products: group.productIds.flatMap((productId, index) => { const product = products.get(productId); return product && product.enabled && isReadyUrl(product.affiliateUrl) ? [toPreviewProduct(product, group.localId, index)] : []; }) })).filter((group) => group.products.length > 0), guides: draft.guides.filter((guide) => guide.enabled && guide.label && guide.url).map((guide) => ({ id: guide.localId, label: guide.label, url: guide.url })) };
+  return { scenarioCode: code, source: 'custom', headline: draft.headline || 'Creator headline', subheadline: draft.subheadline || 'Creator subheadline', description: draft.description || 'Creator description', warningText: draft.warningText, primaryCtaLabel: draft.primaryCtaLabel || 'Build My Streaming Setup', primaryCtaUrl: draft.primaryCtaUrl || CREATOR_SETUP_BUILDER_PATH, secondaryCtaLabel: draft.secondaryCtaLabel, secondaryCtaUrl: draft.secondaryCtaUrl, groups: draft.groups.filter((group) => group.enabled).map((group) => ({ id: group.localId, title: group.title || 'Creator product group', description: group.description, products: group.productIds.flatMap((productId, index) => { const product = products.get(productId); return product && product.enabled && isReadyUrl(product.affiliateUrl) ? [toPreviewProduct(product, group.localId, index)] : []; }) })).filter((group) => group.products.length > 0), guides: draft.guides.filter((guide) => guide.enabled && guide.label && guide.url).map((guide) => ({ id: guide.localId, label: guide.label, url: guide.url })) };
 }
 
 function toPreviewProduct(product: ProductRecord, groupId: string, index: number): AffiliateProductRecord { return { id: `${groupId}-${product.id}`, productId: product.id, sectionId: groupId, title: product.title, retailer: product.retailer, affiliateUrl: product.affiliateUrl, imageUrl: product.imageUrl, priceText: product.defaultPriceText, badge: 'None', shortDescription: product.shortDescription, buttonText: product.retailer === 'Other' ? 'Check Current Price' : `View on ${product.retailer}`, componentType: product.componentType, platform: product.platform, enabled: true, displayOrder: index * 10, createdAt: '', updatedAt: '' }; }
 function isReadyUrl(value: string) { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname !== 'example.com'; } catch { return false; } }
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"><div className="mx-auto my-6 max-w-5xl rounded-3xl border border-white/15 bg-[#0d111d] p-5 shadow-2xl sm:p-6"><div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black">{title}</h2><button className={secondaryButton} onClick={onClose} type="button">Close</button></div>{children}</div></div>; }
-function Field({ label, children, error }: { label: string; children: ReactNode; error?: string }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}{error ? <span className="text-xs font-semibold text-red-300">{error}</span> : null}</label>; }
+function Field({ label, children, error, warning }: { label: string; children: ReactNode; error?: string; warning?: string }) { return <label className="grid gap-2 text-sm font-bold text-slate-300"><span>{label}</span>{children}{error ? <span className="text-xs font-semibold text-red-300">{error}</span> : warning ? <span className="text-xs font-semibold text-amber-300">{warning}</span> : null}</label>; }
 function StatusMessage({ children, error }: { children: ReactNode; error: boolean }) { return <p aria-live="polite" className={`mt-4 rounded-xl border px-3 py-2 text-sm ${error ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'}`}>{children}</p>; }
+function WarningMessage({ warnings }: { warnings: string[] }) { return <div aria-live="polite" className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100"><p className="font-black">Destination warning</p><ul className="mt-1 list-disc pl-5">{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>; }
 
 const panelClass = 'rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5';
 const inputClass = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-400/60 disabled:opacity-50';

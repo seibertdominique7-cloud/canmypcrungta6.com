@@ -8,6 +8,7 @@ export const RECOMMENDATION_SECTION_PURPOSES = [
   'GENERAL',
   'GAME_PURCHASE',
   'PREBUILT',
+  'GUIDANCE',
 ] as const;
 
 export type RecommendationSectionLayout =

@@ -43,6 +43,7 @@ export function CompatibilityResults({
   const [storageCapacityDraft, setStorageCapacityDraft] = useState(storageValue);
   const [storageTypeDraft, setStorageTypeDraft] = useState(storageType);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [recommendedProductIds, setRecommendedProductIds] = useState<string[]>([]);
 
   const openStorageEditor = () => {
     setStorageCapacityDraft(storageValue);
@@ -193,9 +194,15 @@ export function CompatibilityResults({
         ))}
       </div>
 
-      <AffiliateRecommendations result={result} />
+      <AffiliateRecommendations
+        onProductsLoaded={setRecommendedProductIds}
+        result={result}
+      />
 
-      <CreatorRecommendations result={result} />
+      <CreatorRecommendations
+        excludeProductIds={recommendedProductIds}
+        result={result}
+      />
 
       <EmailSignup
         scenario={determineRecommendationScenario(result)}

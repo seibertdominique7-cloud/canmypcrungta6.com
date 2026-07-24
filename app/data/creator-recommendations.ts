@@ -20,11 +20,14 @@ export interface CreatorTemplate {
 }
 
 const COMMON_SUBHEADLINE = 'Playing GTA VI is only the beginning.';
+export const CREATOR_SETUP_BUILDER_PATH = '/creator-setup-builder';
+export const CREATOR_SETUP_GUIDE_PATH = '/creator-setup-guide';
+
 const COMMON_CTA = {
   primaryCtaLabel: 'Build My Streaming Setup',
-  primaryCtaUrl: '/articles',
+  primaryCtaUrl: CREATOR_SETUP_BUILDER_PATH,
   secondaryCtaLabel: 'View Creator Setup Guide',
-  secondaryCtaUrl: '/articles',
+  secondaryCtaUrl: CREATOR_SETUP_GUIDE_PATH,
 };
 
 export const CREATOR_FALLBACK: CreatorCopy = {
@@ -34,9 +37,9 @@ export const CREATOR_FALLBACK: CreatorCopy = {
     'Streaming, recording, editing, and multitasking require more than basic gaming performance. Start with the upgrades that solve your biggest bottleneck, then build out your audio, camera, lighting, and workspace.',
   warningText: '',
   primaryCtaLabel: 'Build My Streaming Setup',
-  primaryCtaUrl: '/articles',
-  secondaryCtaLabel: '',
-  secondaryCtaUrl: '',
+  primaryCtaUrl: CREATOR_SETUP_BUILDER_PATH,
+  secondaryCtaLabel: 'View Creator Setup Guide',
+  secondaryCtaUrl: CREATOR_SETUP_GUIDE_PATH,
 };
 
 const UNKNOWN_COPY: CreatorCopy = {

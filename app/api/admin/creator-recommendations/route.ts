@@ -4,6 +4,7 @@ import {
   getCreatorRecommendationWorkspace,
   saveCreatorRecommendation,
 } from '../../../lib/creator-recommendation-data';
+import { auditCreatorRecommendationDestinations } from '../../../lib/creator-cta-audit';
 import { validateCreatorRecommendationInput } from '../../../lib/creator-recommendation-validation';
 
 export async function GET(request: Request) {
@@ -30,9 +31,11 @@ export async function PUT(request: Request) {
   }
 
   try {
+    const warnings = await auditCreatorRecommendationDestinations(validation.data);
     await saveCreatorRecommendation(validation.data);
     return Response.json({
       message: 'Creator recommendation saved.',
+      warnings,
       workspace: await getCreatorRecommendationWorkspace(),
     });
   } catch (error) {

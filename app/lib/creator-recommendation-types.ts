@@ -80,7 +80,7 @@ export interface CreatorRecommendationInput {
 
 export interface PublicCreatorRecommendationPayload {
   scenarioCode: CoreRecommendationScenarioCode;
-  source: 'custom' | 'fallback';
+  source: 'custom' | 'automatic' | 'fallback';
   headline: string;
   subheadline: string;
   description: string;

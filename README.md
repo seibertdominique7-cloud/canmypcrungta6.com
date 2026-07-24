@@ -77,6 +77,11 @@ admin shows a warning when the selected provider is incomplete. Supported provid
 External images are stored as their exact HTTPS URL and are not copied into upload storage. Set
 `SITE_URL` to the deployed canonical origin so metadata, feeds, and sitemaps use production URLs.
 
+The admin-only AI SEO Publisher creates validated drafts inside the same Article CMS and references
+existing affiliate products by Product ID. See [AI_SEO_PUBLISHER.md](./AI_SEO_PUBLISHER.md) for
+Gemini/OpenAI provider variables, single and batch generation, product references, and the
+review/publish workflow.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

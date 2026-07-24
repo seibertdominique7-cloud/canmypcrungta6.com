@@ -1,4 +1,4 @@
-export type AdminSection = 'dashboard' | 'recommendations' | 'creator-recommendations' | 'products' | 'ads' | 'subscribers' | 'contacts' | 'articles' | 'pages' | 'categories' | 'tags' | 'media' | 'site-content' | 'redirects' | 'settings';
+export type AdminSection = 'dashboard' | 'recommendations' | 'creator-recommendations' | 'products' | 'ads' | 'subscribers' | 'contacts' | 'articles' | 'ai-seo-publisher' | 'pages' | 'categories' | 'tags' | 'media' | 'site-content' | 'redirects' | 'settings';
 
 const links: Array<{ href: string; label: string; section: AdminSection; group: 'Core' | 'Monetization' | 'Content' | 'System' }> = [
   { href: '/admin', label: 'Dashboard', section: 'dashboard', group: 'Core' },
@@ -9,6 +9,7 @@ const links: Array<{ href: string; label: string; section: AdminSection; group: 
   { href: '/admin/creator-recommendations', label: 'Creator Recommendations', section: 'creator-recommendations', group: 'Monetization' },
   { href: '/admin/ads', label: 'Ads', section: 'ads', group: 'Monetization' },
   { href: '/admin/articles', label: 'Articles', section: 'articles', group: 'Content' },
+  { href: '/admin/ai-seo-publisher', label: 'AI SEO Publisher', section: 'ai-seo-publisher', group: 'Content' },
   { href: '/admin/pages', label: 'Pages', section: 'pages', group: 'Content' },
   { href: '/admin/categories', label: 'Categories', section: 'categories', group: 'Content' },
   { href: '/admin/tags', label: 'Tags', section: 'tags', group: 'Content' },

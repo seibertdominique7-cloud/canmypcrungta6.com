@@ -33,13 +33,10 @@ npm run dev
 ```
 
 For schema development, create a migration with `npm run db:migrate -- --name <change-name>`.
-`npm run db:seed` is idempotent: it creates missing core scenarios and their editable default
-sections without overwriting titles, descriptions, layout settings, or products changed in admin.
-The four legacy prebuilt groups remain in the database for rollback safety.
-
-The seeded product links intentionally use `https://example.com/replace-me/...` and are disabled.
-Public APIs also reject this placeholder URL pattern. Replace URLs, images, prices, and copy before
-enabling a product.
+`npm run db:seed` is an explicit structural setup command. It creates missing core scenarios and
+their editable default sections without creating, restoring, or changing Affiliate Products.
+Products deleted in the admin remain deleted when the seed is run again. The four legacy prebuilt
+groups remain in the database for rollback safety.
 
 ## Production database
 
