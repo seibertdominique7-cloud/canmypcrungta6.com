@@ -2,34 +2,44 @@ import { FeatureCard } from './components/FeatureCard';
 import { EmailSignup } from './components/EmailSignup';
 import { ScreenshotAnalyzer } from './components/ScreenshotAnalyzer';
 import { HomepageArticles } from './components/content/HomepageArticles';
+import { HomepageFourthwallMerch } from './components/fourthwall/HomepageFourthwallMerch';
 import { HomepageAd } from './components/ads/AdPlacements';
 import {
   getRequirementDisclaimer,
   getRequirementLabel,
 } from './data/gta6-requirements';
 import { getHomepageArticles, getSiteContentMap } from './lib/cms-data';
+import { getFourthwallProducts, isFourthwallConfigured } from './lib/fourthwall';
 
 export const dynamic = 'force-dynamic';
 export default async function Home() {
-  const [content, articles] = await Promise.all([getSiteContentMap(), getHomepageArticles(3)]);
+  const [content, articles, fourthwallProducts] = await Promise.all([
+    getSiteContentMap(),
+    getHomepageArticles(3),
+    isFourthwallConfigured()
+      ? getFourthwallProducts()
+          .then((products) => products.slice(0, 3))
+          .catch(() => [])
+      : Promise.resolve([]),
+  ]);
   return (
     <div className="public-theme min-h-screen">
       {/* Main content */}
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
+      <main className="relative z-10 flex min-h-screen flex-col items-center px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-12 lg:px-8 lg:pb-0 lg:pt-0">
         {/* Header section with headline and subtitle */}
-        <header className="flex flex-col items-center justify-center w-full max-w-4xl mb-12 sm:mb-16 lg:mb-20 text-center">
+        <header className="mb-8 flex w-full max-w-4xl flex-col items-center justify-center text-center sm:mb-12 lg:mb-20">
           {/* Main headline */}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 tracking-tight leading-tight">
+          <h1 className="mb-4 text-balance text-[clamp(2.35rem,12vw,3rem)] font-bold leading-[1.05] tracking-tight sm:mb-6 sm:text-6xl sm:leading-tight lg:text-7xl">
             <span className="theme-accent-text">{content.homepage_title || 'Can My PC Run GTA VI?'}</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mb-6 leading-relaxed">
+          <p className="mb-4 max-w-xl text-base leading-6 text-slate-300 sm:mb-6 sm:max-w-2xl sm:text-xl sm:leading-relaxed">
             {content.homepage_description || 'Check if your gaming rig meets the current requirements for Grand Theft Auto VI. Get instant compatibility results and personalized upgrade recommendations.'}
           </p>
 
           {/* Disclaimer */}
-          <p className="max-w-2xl rounded-full border border-white/10 bg-slate-950/35 px-4 py-2 text-sm italic text-slate-300 backdrop-blur-sm">
+          <p className="max-w-2xl rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-xs leading-5 italic text-slate-300 backdrop-blur-sm sm:rounded-full sm:px-4 sm:text-sm">
             {'\u26A0\uFE0F'} {getRequirementLabel()}: {content.estimated_requirements_disclaimer || getRequirementDisclaimer()}
           </p>
         </header>
@@ -38,8 +48,10 @@ export default async function Home() {
 
         <HomepageArticles articles={articles} />
 
+        <HomepageFourthwallMerch products={fourthwallProducts} />
+
         {/* Feature cards section */}
-        <section className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4 sm:px-0">
+        <section className="grid w-full max-w-5xl grid-cols-1 gap-5 px-0 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
           {/* Card 1: Screenshot Detection */}
           <FeatureCard
             icon={'\u{1F4F7}'}
@@ -62,9 +74,9 @@ export default async function Home() {
           />
         </section>
 
-        <HomepageAd className="my-10 w-full max-w-5xl px-4 sm:my-12 sm:px-0" />
+        <HomepageAd className="my-8 w-full max-w-5xl px-0 sm:my-12" />
 
-        <div className="mb-16 mt-10 flex w-full justify-center px-4 sm:mt-12 sm:px-0">
+        <div className="mb-10 mt-8 flex w-full justify-center px-0 sm:mb-16 sm:mt-12">
           <EmailSignup description={content.email_signup_description} heading={content.email_signup_heading} signupSource="homepage" variant="homepage" />
         </div>
       </main>

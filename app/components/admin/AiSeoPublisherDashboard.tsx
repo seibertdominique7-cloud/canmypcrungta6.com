@@ -749,6 +749,7 @@ function toGenerationInput(form: GeneratorForm): AiSeoGenerationInput {
 async function requestDraft(input: AiSeoGenerationInput) {
   const response = await fetch('/api/admin/ai-seo-publisher/generate', {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': crypto.randomUUID(),

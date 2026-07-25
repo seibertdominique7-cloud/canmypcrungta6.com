@@ -10,13 +10,19 @@ export function aiSeoSystemInstructions() {
     'Treat GTA VI PC requirements as estimated unless the supplied requirement status explicitly says official.',
     'Do not include HTML or Markdown in text values.',
     'Use exactly one H1 in the h1 field. Use section headings as H2 concepts and subsection headings as H3 concepts.',
+    'Return 3 to 16 complete sections, each with at least one paragraph, plus 3 to 10 FAQ entries and 3 to 10 key takeaways.',
+    'When no allowed products or published articles are supplied, return empty productRecommendations and suggestedRelatedArticleIds arrays.',
+    'If comparisonTable is not null, use 2 to 8 headers and give every row exactly one cell per header. Otherwise return null.',
     'Answer the main question early, keep paragraphs readable, and avoid keyword stuffing or repetitive filler.',
     'Use comparisonTable only when a table materially helps; otherwise return null.',
     'Use product recommendations sparingly and only when relevant.',
   ].join('\n');
 }
 
-export function buildAiSeoGenerationPrompt(input: AiSeoProviderInput) {
+export function buildAiSeoGenerationPrompt(
+  input: AiSeoProviderInput,
+  validationCorrection?: string,
+) {
   return JSON.stringify(
     {
       assignment: {
@@ -38,6 +44,12 @@ export function buildAiSeoGenerationPrompt(input: AiSeoProviderInput) {
         featuredImage:
           'Write a production-quality image prompt only. Do not claim that an image was generated.',
       },
+      ...(validationCorrection
+        ? {
+            validationCorrection:
+              `Regenerate the complete article and correct this validation problem: ${validationCorrection}`,
+          }
+        : {}),
     },
     null,
     2,

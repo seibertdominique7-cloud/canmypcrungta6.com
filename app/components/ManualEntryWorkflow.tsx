@@ -10,6 +10,11 @@ import {
   normalizeManualEntry,
 } from '../lib/manual-entry';
 import { createEmptyDetectedSpecs, createEmptyEditableSpecs, type EditableHardwareSpecs } from '../lib/hardware-types';
+import {
+  trackCheckerResult,
+  trackManualSpecsSubmitted,
+  trackPcCheckerStarted,
+} from '../lib/analytics';
 
 const MANUAL_RESULTS_TITLE = 'Can my PC run GTA VI?';
 
@@ -67,6 +72,13 @@ export function ManualEntryWorkflow() {
       return;
     }
 
+    const manualResult = evaluateCompatibility(
+      normalized.specs,
+      createManualDetectedSpecs(normalized.specs),
+    );
+    trackPcCheckerStarted('manual');
+    trackManualSpecsSubmitted();
+    trackCheckerResult(manualResult.overall.status, 'manual');
     setSpecs(normalized.specs);
     setErrorMessage(null);
     setHasChecked(true);

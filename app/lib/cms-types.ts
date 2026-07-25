@@ -157,7 +157,7 @@ export interface MediaFolderRecord {
 
 export interface MediaUsageRecord {
   id: string;
-  kind: 'article' | 'page' | 'affiliate-product' | 'category' | 'site-content';
+  kind: 'article' | 'page' | 'affiliate-product' | 'merchandise-product' | 'category' | 'site-content';
   location: string;
   label: string;
   adminUrl: string;
@@ -209,6 +209,7 @@ export interface ContentWorkspace {
     shortDescription: string;
     componentType: ProductComponentType;
   }>;
+  merchandiseProducts: import('./merch-types').MerchandiseProductRecord[];
 }
 
 export function getPagePublicPath(page: Pick<PageRecord, 'requiredPageKey' | 'slug'>) {

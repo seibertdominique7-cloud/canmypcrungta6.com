@@ -437,7 +437,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, {
     if (editor) lastClickedLinkRef.current = closestLink(event.target as Node, editor);
     const block = editor ? directEditorChild(event.target as Node, editor) : null;
     const selection = window.getSelection();
-    const nonEditableBlock = block && (block.getAttribute('contenteditable') === 'false' || ['CMS-AFFILIATE', 'CMS-BLOCK', 'FIGURE', 'HR'].includes(block.tagName));
+    const nonEditableBlock = block && (block.getAttribute('contenteditable') === 'false' || ['CMS-AFFILIATE', 'CMS-MERCH', 'CMS-BLOCK', 'FIGURE', 'HR'].includes(block.tagName));
     if (nonEditableBlock || selection?.isCollapsed) setActiveBlockFromNode(event.target as Node);
   }, [setActiveBlockFromNode]);
 
@@ -643,7 +643,7 @@ const EditorSurface = memo(forwardRef<HTMLDivElement, {
     <div
       aria-label="Content body"
       aria-multiline="true"
-      className="cms-admin-editor h-[min(70vh,720px)] min-h-[460px] overflow-y-auto overscroll-contain scroll-smooth px-5 py-4 text-base leading-7 text-slate-200 outline-none [scrollbar-color:rgba(139,92,246,0.5)_rgba(15,23,42,0.75)] [&_a]:font-bold [&_a]:text-violet-300 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_cms-affiliate]:my-3 [&_cms-affiliate]:grid [&_cms-affiliate]:cursor-default [&_cms-affiliate]:gap-1 [&_cms-affiliate]:rounded-xl [&_cms-affiliate]:border [&_cms-affiliate]:border-emerald-400/30 [&_cms-affiliate]:bg-emerald-500/10 [&_cms-affiliate]:p-4 [&_cms-affiliate_span]:text-emerald-100 [&_cms-affiliate_small]:text-emerald-300/70 [&_cms-block]:my-3 [&_cms-block]:grid [&_cms-block]:cursor-default [&_cms-block]:gap-1 [&_cms-block]:rounded-xl [&_cms-block]:border [&_cms-block]:border-cyan-400/25 [&_cms-block]:bg-cyan-500/10 [&_cms-block]:p-4 [&_figure]:my-4 [&_figure]:rounded-2xl [&_figure]:border [&_figure]:border-white/10 [&_figure]:bg-black/20 [&_figure]:p-3 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-slate-400 [&_h1]:my-3 [&_h1]:text-3xl [&_h1]:font-black [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-black [&_h3]:my-2 [&_h3]:text-xl [&_h3]:font-black [&_h4]:my-2 [&_h4]:text-lg [&_h4]:font-black [&_hr]:my-5 [&_hr]:border-white/10 [&_img]:mx-auto [&_img]:max-h-[520px] [&_img]:max-w-full [&_img]:rounded-xl [&_img]:object-contain [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-black/50 [&_pre]:p-4 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:p-2 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:p-2 [&_ul]:list-disc"
+      className="cms-admin-editor h-[min(70vh,720px)] min-h-[460px] overflow-y-auto overscroll-contain scroll-smooth px-5 py-4 text-base leading-7 text-slate-200 outline-none [scrollbar-color:rgba(139,92,246,0.5)_rgba(15,23,42,0.75)] [&_a]:font-bold [&_a]:text-violet-300 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-4 [&_blockquote]:py-2 [&_cms-affiliate]:my-3 [&_cms-affiliate]:grid [&_cms-affiliate]:cursor-default [&_cms-affiliate]:gap-1 [&_cms-affiliate]:rounded-xl [&_cms-affiliate]:border [&_cms-affiliate]:border-emerald-400/30 [&_cms-affiliate]:bg-emerald-500/10 [&_cms-affiliate]:p-4 [&_cms-affiliate_span]:text-emerald-100 [&_cms-affiliate_small]:text-emerald-300/70 [&_cms-merch]:my-3 [&_cms-merch]:grid [&_cms-merch]:cursor-default [&_cms-merch]:gap-1 [&_cms-merch]:rounded-xl [&_cms-merch]:border [&_cms-merch]:border-pink-400/30 [&_cms-merch]:bg-pink-500/10 [&_cms-merch]:p-4 [&_cms-merch_span]:text-pink-100 [&_cms-merch_small]:text-pink-300/70 [&_cms-block]:my-3 [&_cms-block]:grid [&_cms-block]:cursor-default [&_cms-block]:gap-1 [&_cms-block]:rounded-xl [&_cms-block]:border [&_cms-block]:border-cyan-400/25 [&_cms-block]:bg-cyan-500/10 [&_cms-block]:p-4 [&_figure]:my-4 [&_figure]:rounded-2xl [&_figure]:border [&_figure]:border-white/10 [&_figure]:bg-black/20 [&_figure]:p-3 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-sm [&_figcaption]:text-slate-400 [&_h1]:my-3 [&_h1]:text-3xl [&_h1]:font-black [&_h2]:my-3 [&_h2]:text-2xl [&_h2]:font-black [&_h3]:my-2 [&_h3]:text-xl [&_h3]:font-black [&_h4]:my-2 [&_h4]:text-lg [&_h4]:font-black [&_hr]:my-5 [&_hr]:border-white/10 [&_img]:mx-auto [&_img]:max-h-[520px] [&_img]:max-w-full [&_img]:rounded-xl [&_img]:object-contain [&_li]:ml-6 [&_ol]:list-decimal [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:bg-black/50 [&_pre]:p-4 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-white/10 [&_td]:p-2 [&_th]:border [&_th]:border-white/10 [&_th]:bg-white/5 [&_th]:p-2 [&_ul]:list-disc"
       contentEditable={!disabled}
       onBlur={onSelection}
       onClick={onBlockClick}
@@ -668,7 +668,7 @@ export function cleanEditorHtml(source: string) {
   return documentValue.body.innerHTML.trim() || '<p><br></p>';
 }
 
-const allowedElements = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'DEL', 'SMALL', 'H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'FIGURE', 'FIGCAPTION', 'IMG', 'DIV', 'SPAN', 'CMS-AFFILIATE', 'CMS-BLOCK']);
+const allowedElements = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'DEL', 'SMALL', 'H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'FIGURE', 'FIGCAPTION', 'IMG', 'DIV', 'SPAN', 'CMS-AFFILIATE', 'CMS-MERCH', 'CMS-BLOCK']);
 
 function cleanNode(root: Element) {
   for (const child of Array.from(root.children)) {
@@ -734,6 +734,7 @@ function allowedAttribute(tag: string, name: string, value: string) {
   if (tag === 'FIGURE') return ['data-cms-image', 'data-align', 'data-size', 'contenteditable'].includes(lower);
   if (tag === 'TH' || tag === 'TD') return ['colspan', 'rowspan', 'scope'].includes(lower);
   if (tag === 'CMS-AFFILIATE') return ['product-id', 'contenteditable'].includes(lower);
+  if (tag === 'CMS-MERCH') return ['product-id', 'contenteditable'].includes(lower);
   if (tag === 'CMS-BLOCK') return ['kind', 'argument', 'contenteditable'].includes(lower);
   return false;
 }
@@ -752,6 +753,7 @@ function editorBlocksForRange(editor: HTMLElement, range: Range) {
 
 function editorBlockLabel(block: HTMLElement) {
   if (block.tagName === 'CMS-AFFILIATE') return 'Affiliate product';
+  if (block.tagName === 'CMS-MERCH') return 'Merchandise product';
   if (block.tagName === 'CMS-BLOCK') return block.getAttribute('kind')?.replace(/-/g, ' ') || 'Content block';
   if (block.tagName === 'FIGURE') return 'Image';
   if (block.tagName === 'BLOCKQUOTE') return 'Quote';

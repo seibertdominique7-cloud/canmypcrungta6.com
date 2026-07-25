@@ -11,14 +11,19 @@ import {
   hasInlineAffiliateLinks,
   imageHtml,
   inlineAffiliateProductIds,
+  merchandiseProductHtml,
+  merchandiseProductIds,
   removeAffiliateProduct,
+  removeMerchandiseProduct,
   replaceAffiliateProduct,
+  replaceMerchandiseProduct,
 } from '../../lib/rich-text-shared';
 import { RecommendationProductCard } from '../RecommendationProductCard';
 import { AdminMediaChooser, type AdminImageSelection } from './AdminImageField';
 import { RichTextEditor, cleanEditorHtml, type RichTextEditorHandle } from './RichTextEditor';
 
 type Product = ContentWorkspace['affiliateProducts'][number];
+type Merchandise = ContentWorkspace['merchandiseProducts'][number];
 
 export function ContentComposer({
   body,
@@ -44,7 +49,11 @@ export function ContentComposer({
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [merchPickerOpen, setMerchPickerOpen] = useState(false);
+  const [merchSearch, setMerchSearch] = useState('');
+  const [editingMerchId, setEditingMerchId] = useState<string | null>(null);
   const selectedProductIds = affiliateProductIds(body);
+  const selectedMerchIds = merchandiseProductIds(body);
   const hasInlineAffiliateLink = hasInlineAffiliateLinks(body);
   const inlineLinkWarnings = inlineAffiliateProductIds(body).flatMap((id) => {
     const product = workspace.affiliateProducts.find((item) => item.id === id);
@@ -83,6 +92,7 @@ export function ContentComposer({
       <div className="flex flex-wrap gap-2">
         <button className={smallButton} onClick={() => setMediaOpen(true)} type="button">Add Image</button>
         <button className={smallButton} onClick={() => { setEditingProductId(null); setProductPickerOpen(true); }} type="button">Add Product</button>
+        <button className={smallButton} onClick={() => { setEditingMerchId(null); setMerchPickerOpen(true); }} type="button">Add Merchandise</button>
         <details className="relative">
           <summary className={`${smallButton} cursor-pointer list-none`}>Add Block</summary>
           <div className="absolute left-0 top-11 z-30 grid min-w-44 gap-1 rounded-xl border border-white/15 bg-[#111827] p-2 shadow-2xl">
@@ -110,6 +120,7 @@ export function ContentComposer({
             excerpt={excerpt}
             featuredImage={featuredImage}
             products={workspace.affiliateProducts}
+            merchandise={workspace.merchandiseProducts}
             title={title}
           />
         ) : null}
@@ -155,6 +166,30 @@ export function ContentComposer({
         </div>
       ) : null}
 
+      {selectedMerchIds.length ? (
+        <div className="rounded-2xl border border-pink-400/20 bg-pink-500/[0.05] p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-pink-200">Merchandise in this content</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {selectedMerchIds.map((id) => {
+              const product = workspace.merchandiseProducts.find((item) => item.id === id);
+              return (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3" key={id}>
+                  <span className="truncate text-sm font-bold text-white">{product?.title || `Missing merchandise (${id})`}</span>
+                  <span className="flex gap-2">
+                    <button className={smallButton} onClick={() => { setEditingMerchId(id); setMerchPickerOpen(true); }} type="button">Edit</button>
+                    <button className={dangerButton} onClick={() => onChange(removeMerchandiseProduct(body, id))} type="button">Remove</button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {selectedMerchIds.some((id) => {
+            const product = workspace.merchandiseProducts.find((item) => item.id === id);
+            return !product || !product.enabled || !product.articleVisible;
+          }) ? <p className="mt-3 text-xs leading-5 text-amber-200">One or more merchandise blocks are hidden publicly because the product is missing, disabled, or not enabled for articles.</p> : null}
+        </div>
+      ) : null}
+
       <AdminMediaChooser
         folders={workspace.mediaFolders}
         media={workspace.media}
@@ -190,7 +225,56 @@ export function ContentComposer({
           setSearch={setProductSearch}
         />
       ) : null}
+      {merchPickerOpen ? (
+        <MerchandisePicker
+          editingId={editingMerchId}
+          onAdd={(product) => {
+            if (editingMerchId) onChange(replaceMerchandiseProduct(body, editingMerchId, product));
+            else editorRef.current?.insertHtml(merchandiseProductHtml(product));
+            setEditingMerchId(null);
+            setMerchPickerOpen(false);
+          }}
+          onClose={() => { setEditingMerchId(null); setMerchPickerOpen(false); }}
+          products={workspace.merchandiseProducts.filter((item) => item.enabled && item.articleVisible)}
+          search={merchSearch}
+          selectedIds={selectedMerchIds}
+          setSearch={setMerchSearch}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function MerchandisePicker({ products, selectedIds, search, setSearch, onAdd, onClose, editingId }: { products: Merchandise[]; selectedIds: string[]; search: string; setSearch: (value: string) => void; onAdd: (product: Merchandise) => void; onClose: () => void; editingId: string | null }) {
+  const visible = products.filter((product) => `${product.title} ${product.productType} ${product.badge}`.toLowerCase().includes(search.toLowerCase()));
+  return (
+    <div aria-modal="true" className="fixed inset-0 z-[90] overflow-y-auto bg-black/80 p-4 backdrop-blur-sm" role="dialog">
+      <div className="mx-auto my-10 max-w-3xl rounded-3xl border border-white/15 bg-[#0d111d] p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-black uppercase tracking-wide text-pink-300">Merchandise catalog</p><h2 className="mt-1 text-xl font-black">{editingId ? 'Edit Merchandise Block' : 'Add Merchandise'}</h2><p className="mt-1 text-sm text-slate-400">Only enabled products approved for article use appear here.</p></div>
+          <button className={smallButton} onClick={onClose} type="button">Done</button>
+        </div>
+        <input autoFocus className={`${inputClass} mt-5`} onChange={(event) => setSearch(event.target.value)} placeholder="Search merchandise" value={search} />
+        <div className="mt-4 grid max-h-[60vh] gap-3 overflow-y-auto sm:grid-cols-2">
+          {visible.map((product) => {
+            const selected = selectedIds.includes(product.id) && product.id !== editingId;
+            return (
+              <article className="flex min-h-28 gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3" key={product.id}>
+                <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-black/30">
+                  {product.imageUrl ? <img alt="" className="h-full w-full object-contain p-1" src={product.imageUrl} /> : <span className="text-[10px] font-bold uppercase text-slate-600">No image</span>}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <p className="truncate font-black text-white">{product.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{product.productType} · {product.priceText}</p>
+                  <button className={`${selected ? smallButton : primaryButton} mt-auto`} disabled={selected} onClick={() => onAdd(product)} type="button">{selected ? 'Added' : editingId ? 'Use this product' : 'Add merchandise'}</button>
+                </div>
+              </article>
+            );
+          })}
+          {!visible.length ? <p className="col-span-full rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">No enabled article merchandise matches this search.</p> : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -227,7 +311,7 @@ function ProductPicker({ products, selectedIds, search, setSearch, onAdd, onClos
   );
 }
 
-function DraftPreview({ body, title, excerpt, featuredImage, products }: { body: string; title: string; excerpt: string; featuredImage: string; products: Product[] }) {
+function DraftPreview({ body, title, excerpt, featuredImage, products, merchandise }: { body: string; title: string; excerpt: string; featuredImage: string; products: Product[]; merchandise: Merchandise[] }) {
   const [html, setHtml] = useState('<p class="text-slate-500">Preparing preview…</p>');
   useEffect(() => {
     const frame = requestAnimationFrame(() => setHtml(cleanEditorHtml(bodyToEditorHtml(body))));
@@ -235,6 +319,7 @@ function DraftPreview({ body, title, excerpt, featuredImage, products }: { body:
   }, [body]);
   const segments = useMemo(() => previewSegments(html), [html]);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const merchandiseMap = useMemo(() => new Map(merchandise.map((product) => [product.id, product])), [merchandise]);
   const hasAffiliate = hasInlineAffiliateLinks(body) || segments.some((segment) => segment.kind === 'product' && productMap.has(segment.productId));
   return (
     <div className="max-h-[760px] overflow-y-auto rounded-2xl border border-white/10 bg-[#090d17] p-5 shadow-inner">
@@ -246,6 +331,10 @@ function DraftPreview({ body, title, excerpt, featuredImage, products }: { body:
         {segments.map((segment, index) => {
           if (segment.kind === 'html') return <div dangerouslySetInnerHTML={{ __html: segment.html }} key={index} />;
           if (segment.kind === 'block') return <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-4" key={index}><strong className="capitalize">{segment.blockKind.replace('-', ' ')}</strong><p className="mt-1 whitespace-pre-line text-sm text-cyan-50/80">{segment.text}</p></div>;
+          if (segment.kind === 'merchandise') {
+            const merch = merchandiseMap.get(segment.productId);
+            return merch ? <div className="rounded-2xl border border-pink-400/25 bg-pink-500/10 p-4" key={index}><p className="text-xs font-black uppercase tracking-wide text-pink-200">Merchandise preview</p><div className="mt-3 flex gap-3">{merch.imageUrl ? <img alt="" className="size-20 rounded-xl bg-black/20 object-contain" src={merch.imageUrl} /> : null}<div><strong className="text-white">{merch.title}</strong><p className="mt-1 text-sm text-slate-300">{merch.shortDescription}</p><p className="mt-2 text-xs font-black text-pink-200">{merch.priceText}</p></div></div></div> : <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-200" key={index}>This merchandise product is missing.</div>;
+          }
           const product = productMap.get(segment.productId);
           return product ? <div className="max-w-xl" key={index}><RecommendationProductCard preview product={{ ...product, badge: 'Recommended', buttonText: 'View Product', platform: null }} /></div> : <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-200" key={index}>This product is missing or disabled.</div>;
         })}
@@ -255,20 +344,21 @@ function DraftPreview({ body, title, excerpt, featuredImage, products }: { body:
   );
 }
 
-type PreviewSegment = { kind: 'html'; html: string } | { kind: 'product'; productId: string } | { kind: 'block'; blockKind: string; text: string };
+type PreviewSegment = { kind: 'html'; html: string } | { kind: 'product'; productId: string } | { kind: 'merchandise'; productId: string } | { kind: 'block'; blockKind: string; text: string };
 function previewSegments(html: string): PreviewSegment[] {
   const segments: PreviewSegment[] = [];
-  const pattern = /<(cms-affiliate|cms-block)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  const pattern = /<(cms-affiliate|cms-merch|cms-block)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
   let offset = 0;
   for (const match of html.matchAll(pattern)) {
     const index = match.index ?? 0;
     if (index > offset) segments.push({ kind: 'html', html: html.slice(offset, index) });
     if (match[1].toLowerCase() === 'cms-affiliate') segments.push({ kind: 'product', productId: attribute(match[2], 'product-id') });
+    else if (match[1].toLowerCase() === 'cms-merch') segments.push({ kind: 'merchandise', productId: attribute(match[2], 'product-id') });
     else segments.push({ kind: 'block', blockKind: attribute(match[2], 'kind'), text: stripHtml(match[3]) });
     offset = index + match[0].length;
   }
   if (offset < html.length) segments.push({ kind: 'html', html: html.slice(offset) });
-  const monetized = (segment: PreviewSegment) => segment.kind === 'product' || (segment.kind === 'block' && ['email-signup', 'ad'].includes(segment.blockKind));
+  const monetized = (segment: PreviewSegment) => segment.kind === 'product' || segment.kind === 'merchandise' || (segment.kind === 'block' && ['email-signup', 'ad'].includes(segment.blockKind));
   const early = segments.slice(0, 2).filter(monetized);
   return early.length ? [...segments.slice(0, 2).filter((segment) => !monetized(segment)), ...segments.slice(2), ...early] : segments;
 }

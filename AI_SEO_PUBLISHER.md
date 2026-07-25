@@ -12,7 +12,8 @@ to the deployment environment for production:
 
 ```dotenv
 AI_SEO_PROVIDER=gemini
-AI_SEO_MODEL=gemini-3.5-flash
+AI_SEO_MODEL=gemini-3.6-flash
+AI_SEO_FALLBACK_MODEL=gemini-3.5-flash-lite
 AI_SEO_TIMEOUT_MS=90000
 GEMINI_API_KEY=your-private-api-key
 ```
@@ -21,6 +22,9 @@ GEMINI_API_KEY=your-private-api-key
 after changing local environment variables. Redeploy after changing production
 variables. The Gemini configuration uses Google's server-side `@google/genai`
 SDK and validates structured JSON before saving a draft.
+Transient Gemini `429` and `5xx` responses are retried with bounded exponential
+backoff. If the primary model remains unavailable because of a `5xx` capacity
+error, the publisher uses `AI_SEO_FALLBACK_MODEL` for that generation request.
 
 OpenAI remains available by setting `AI_SEO_PROVIDER=openai`,
 `AI_SEO_MODEL` to the chosen OpenAI model, and `OPENAI_API_KEY`. The provider

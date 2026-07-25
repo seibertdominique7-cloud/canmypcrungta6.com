@@ -2,13 +2,23 @@ import type { MetadataRoute } from 'next';
 
 import { getIndexableContent } from './lib/cms-data';
 import { getSiteUrl } from './lib/seo';
+import { getFourthwallProducts, isFourthwallConfigured } from './lib/fourthwall';
+import { getMerchStoreSettings } from './lib/merch-data';
+import { getStoreSitemapEntry } from './lib/merch-sitemap';
 
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const site = getSiteUrl();
-  const content = await getIndexableContent();
+  const [content, merchSettings, fourthwallProducts] = await Promise.all([
+    getIndexableContent(),
+    getMerchStoreSettings(),
+    isFourthwallConfigured()
+      ? getFourthwallProducts().catch(() => [])
+      : Promise.resolve([]),
+  ]);
 
+  const storeEntry = getStoreSitemapEntry(merchSettings, site);
   return [
     { url: site, changeFrequency: 'weekly', priority: 1 },
     { url: `${site}/manual`, changeFrequency: 'monthly', priority: 0.8 },
@@ -28,6 +38,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.2,
     },
+    ...(storeEntry ? [storeEntry] : []),
+    ...(isFourthwallConfigured()
+      ? [
+          {
+            url: `${site}/merch`,
+            changeFrequency: 'daily' as const,
+            priority: 0.7,
+          },
+          ...fourthwallProducts.map((product) => ({
+            url: `${site}/merch/${product.slug}`,
+            lastModified: product.updatedAt,
+            changeFrequency: 'weekly' as const,
+            priority: 0.6,
+            images: product.images[0]
+              ? [product.images[0].transformedUrl || product.images[0].url]
+              : undefined,
+          })),
+        ]
+      : []),
     ...content.articles.map((item) => ({
       url: `${site}/articles/${item.slug}`,
       lastModified: item.updatedAt,

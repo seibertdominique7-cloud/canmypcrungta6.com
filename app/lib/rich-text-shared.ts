@@ -53,8 +53,40 @@ export function affiliateProductIds(body: string) {
   return Array.from(new Set(ids));
 }
 
+export function merchandiseProductIds(body: string) {
+  const ids: string[] = [];
+  for (const match of body.matchAll(/<cms-merch\b[^>]*\bproduct-id=["']([^"']+)["'][^>]*>[\s\S]*?<\/cms-merch>/gi)) ids.push(match[1]);
+  for (const match of body.matchAll(/:::merchandise\s+([^\s]+)\s*\n[\s\S]*?\n:::/g)) ids.push(match[1]);
+  return Array.from(new Set(ids));
+}
+
 export function affiliateProductHtml(product: Pick<RichTextProductSummary, 'id' | 'title'>) {
   return `<cms-affiliate product-id="${escapeAttribute(product.id)}" contenteditable="false"><strong>Affiliate product</strong><span>${escapeHtml(product.title)}</span><small>Managed product block</small></cms-affiliate><p><br></p>`;
+}
+
+export function merchandiseProductHtml(product: { id: string; title: string }) {
+  return `<cms-merch product-id="${escapeAttribute(product.id)}" contenteditable="false"><strong>Merchandise</strong><span>${escapeHtml(product.title)}</span><small>Managed merchandise block</small></cms-merch><p><br></p>`;
+}
+
+export function replaceMerchandiseProduct(
+  body: string,
+  productId: string,
+  product: { id: string; title: string },
+) {
+  const escapedId = escapeRegExp(productId);
+  const replacement = merchandiseProductHtml(product).replace(/<p><br><\/p>$/, '');
+  const nextHtml = bodyToEditorHtml(body).replace(
+    new RegExp(`<cms-merch\\b[^>]*\\bproduct-id=["']${escapedId}["'][^>]*>[\\s\\S]*?<\\/cms-merch>`, 'i'),
+    replacement,
+  );
+  return richTextBody(nextHtml);
+}
+
+export function removeMerchandiseProduct(body: string, productId: string) {
+  const escapedId = escapeRegExp(productId);
+  return body
+    .replace(new RegExp(`<cms-merch\\b[^>]*\\bproduct-id=["']${escapedId}["'][^>]*>[\\s\\S]*?<\\/cms-merch>\\s*(?:<p><br\\s*\\/?><\\/p>)?`, 'i'), '')
+    .replace(new RegExp(`:::merchandise\\s+${escapedId}\\s*\\n[\\s\\S]*?\\n:::\\s*`, 'i'), '');
 }
 
 export function replaceAffiliateProduct(body: string, productId: string, product: Pick<RichTextProductSummary, 'id' | 'title'>) {
@@ -133,6 +165,7 @@ function legacyMarkdownToHtml(body: string) {
 
 function legacyDirective(kind: string, argument: string, lines: string[]) {
   if (kind === 'affiliate') return affiliateProductHtml({ id: argument, title: 'Selected affiliate product' });
+  if (kind === 'merchandise') return merchandiseProductHtml({ id: argument, title: 'Selected merchandise product' });
   if (kind === 'image') {
     const fields = Object.fromEntries(lines.map((line) => { const separator = line.indexOf(':'); return separator < 0 ? ['', ''] : [line.slice(0, separator).trim().toLowerCase(), line.slice(separator + 1).trim()]; }));
     return imageHtml(fields.url ?? '', { alt: fields.alt ?? '', caption: fields.caption ?? '', align: fields.align ?? 'center', size: fields.size ?? 'large', link: fields.link ?? '' });

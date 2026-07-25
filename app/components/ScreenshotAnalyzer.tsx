@@ -35,6 +35,11 @@ import {
   MANUAL_STORAGE_TYPES,
   parseManualStorageCapacity,
 } from '../lib/manual-storage';
+import {
+  trackCheckerResult,
+  trackPcCheckerStarted,
+  trackScreenshotUploaded,
+} from '../lib/analytics';
 
 const MAX_SCREENSHOT_SIZE_BYTES = 10 * 1024 * 1024;
 const SCREENSHOT_UPLOAD_INPUT_ID = 'screenshot-upload-input';
@@ -114,8 +119,8 @@ export function ScreenshotAnalyzer({ uploadButtonText, manualEntryButtonText, sc
 
   return (
     <>
-      <section className="mb-16 w-full max-w-3xl px-4 sm:px-0 lg:mb-24">
-        <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
+      <section className="mb-8 w-full max-w-3xl px-0 sm:mb-16 lg:mb-24">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:gap-3">
         <input
           ref={inputRef}
           id={SCREENSHOT_UPLOAD_INPUT_ID}
@@ -133,27 +138,30 @@ export function ScreenshotAnalyzer({ uploadButtonText, manualEntryButtonText, sc
         </label>
         <button
           type="button"
-          className="theme-primary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
+          className="theme-primary-button flex-1 rounded-lg px-5 py-3.5 text-center text-base font-bold sm:px-8 sm:py-4 sm:text-lg"
           aria-label={SCREENSHOT_UPLOAD_COPY.inputLabel}
           disabled={isAnalyzing}
           onClick={openFilePicker}
+          // Form-processing extensions may inject attributes before React hydrates.
+          suppressHydrationWarning
         >
           {'📸'} {uploadButtonText || 'Upload Screenshot'}
         </button>
 
         <button
           type="button"
-          className="theme-secondary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
+          className="theme-secondary-button flex-1 rounded-lg px-5 py-3.5 text-center text-base font-bold sm:px-8 sm:py-4 sm:text-lg"
           aria-label={SCREENSHOT_UPLOAD_COPY.manualEntryLabel}
           disabled={isAnalyzing}
           onClick={startManualEntry}
+          suppressHydrationWarning
         >
           {'⚙️'} {manualEntryButtonText || 'Enter Specs Manually'}
         </button>
 
         <a
           href="#download-scanner"
-          className="theme-secondary-button flex-1 rounded-lg px-8 py-4 text-center text-lg font-bold"
+          className="theme-secondary-button flex-1 rounded-lg px-5 py-3.5 text-center text-base font-bold sm:px-8 sm:py-4 sm:text-lg"
           aria-label={SCREENSHOT_UPLOAD_COPY.scannerLabel}
         >
           {'⬇️'} {scannerText || 'Automatic PC scanner coming soon.'}
@@ -187,7 +195,7 @@ export function ScreenshotAnalyzer({ uploadButtonText, manualEntryButtonText, sc
 
 function ScreenshotGuide() {
   return (
-    <details className="theme-glass-card group/guide mt-4 overflow-hidden rounded-xl text-left">
+    <details className="theme-glass-card group/guide mt-3 overflow-hidden rounded-xl text-left sm:mt-4">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-bold text-slate-200 transition hover:bg-fuchsia-400/[0.06] hover:text-white sm:px-5 [&::-webkit-details-marker]:hidden">
         <span>How to get your PC specs</span>
         <span
@@ -356,6 +364,7 @@ function useScreenshotAnalysis() {
     setErrorMessage(null);
     setSelectedFile(file);
     setPreviewUrl(objectUrl);
+    trackScreenshotUploaded(file.type);
   };
 
   const resetAll = () => {
@@ -385,6 +394,7 @@ function useScreenshotAnalysis() {
     setAnalysisMessage(null);
     setOcrProgress(0);
     setIsAnalyzing(true);
+    trackPcCheckerStarted('screenshot');
 
     let worker: OcrWorker | null = null;
     const isCurrentRun = () => ocrRunIdRef.current === runId;
@@ -405,6 +415,10 @@ function useScreenshotAnalysis() {
       } = await worker.recognize(selectedFile);
       const parsedHardware = parseHardwareSpecs(text);
       const parsedEditableSpecs = detectedToEditableSpecs(parsedHardware.specs);
+      const parsedCompatibilityResult = evaluateCompatibility(
+        parsedEditableSpecs,
+        parsedHardware.specs,
+      );
 
       if (process.env.NODE_ENV === 'development') {
         logRamPipeline(parsedHardware, parsedEditableSpecs);
@@ -416,6 +430,7 @@ function useScreenshotAnalysis() {
         setDetectedSpecs(parsedHardware.specs);
         setEditableSpecs(parsedEditableSpecs);
         setHasAnalyzed(true);
+        trackCheckerResult(parsedCompatibilityResult.overall.status, 'screenshot');
 
         if (!parsedHardware.hasUsefulText) {
           setAnalysisMessage(SCREENSHOT_UPLOAD_COPY.tooLittleText);

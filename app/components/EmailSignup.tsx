@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { type FormEvent, useId, useState } from 'react';
 
 import type { CoreRecommendationScenarioCode } from '../data/recommendation-scenarios';
+import { trackEmailSignupCompleted } from '../lib/analytics';
 import type { EmailSignupSource } from '../lib/subscriber-types';
 
 type EmailSignupProps = {
@@ -67,6 +68,7 @@ export function EmailSignup(props: EmailSignupProps) {
         throw new Error(payload.error || 'We could not complete your subscription.');
       }
 
+      trackEmailSignupCompleted(props.signupSource);
       setMessage(payload.message || "You're subscribed. We'll send GTA VI updates to your email.");
       setEmail('');
       setCompany('');
@@ -84,17 +86,17 @@ export function EmailSignup(props: EmailSignupProps) {
   return (
     <section
       aria-labelledby={`${formId}-heading`}
-      className={`theme-glass-card w-full rounded-2xl text-left ${isHomepage ? 'max-w-3xl p-5 sm:p-6' : 'border-x-0 border-b-0 px-4 py-5 sm:px-6'}`}
+      className={`theme-glass-card w-full rounded-2xl text-left ${isHomepage ? 'max-w-3xl p-4 sm:p-6' : 'border-x-0 border-b-0 px-4 py-5 sm:px-6'}`}
     >
-      <div className={isHomepage ? 'sm:flex sm:items-start sm:justify-between sm:gap-8' : ''}>
-        <div className={isHomepage ? 'sm:max-w-sm' : ''}>
+      <div className={isHomepage ? 'lg:flex lg:items-start lg:justify-between lg:gap-8' : ''}>
+        <div className={isHomepage ? 'lg:max-w-sm' : ''}>
           <p className="theme-kicker text-[10px] font-black uppercase tracking-[0.18em]">
             Email updates
           </p>
           <h2 id={`${formId}-heading`} className="mt-1 text-xl font-black text-white">
             {props.heading || (isHomepage ? 'GTA VI Launch Alerts' : isArticle ? 'Get GTA VI PC Updates' : 'Stay GTA VI Ready')}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
+          <p className="mt-2 text-sm leading-5 text-slate-400 sm:leading-6">
             {props.description || (isHomepage
               ? 'Get notified when official PC requirements, release details, and major updates are announced.'
               : isArticle
@@ -104,7 +106,7 @@ export function EmailSignup(props: EmailSignupProps) {
         </div>
 
         <form
-          className={`${isHomepage ? 'mt-5 sm:mt-0 sm:min-w-0 sm:flex-1' : 'mt-4'} grid gap-3`}
+          className={`${isHomepage ? 'mt-5 lg:mt-0 lg:min-w-0 lg:flex-1' : 'mt-4'} grid gap-3`}
           onSubmit={handleSubmit}
         >
           <div className="grid gap-1.5">
@@ -126,12 +128,15 @@ export function EmailSignup(props: EmailSignupProps) {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@example.com"
                 required
+                // Form-processing extensions may inject attributes before React hydrates.
+                suppressHydrationWarning
                 type="email"
                 value={email}
               />
               <button
                 className="theme-primary-button shrink-0 rounded-lg px-5 py-2.5 text-sm font-black"
                 disabled={busy}
+                suppressHydrationWarning
                 type="submit"
               >
                 {busy ? 'Subscribing...' : 'Notify Me'}
@@ -146,6 +151,7 @@ export function EmailSignup(props: EmailSignupProps) {
               id={`${formId}-company`}
               name="company"
               onChange={(event) => setCompany(event.target.value)}
+              suppressHydrationWarning
               tabIndex={-1}
               type="text"
               value={company}

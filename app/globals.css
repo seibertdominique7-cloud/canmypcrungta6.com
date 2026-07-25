@@ -164,6 +164,20 @@ body {
   color: #fbcfe8;
 }
 
+.merch-cart-drawer {
+  animation: merch-cart-enter 180ms ease-out;
+}
+
+@keyframes merch-cart-enter {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
 .cms-admin-editor > * {
   border-radius: 0.55rem;
   margin-inline: -0.4rem;
@@ -183,6 +197,7 @@ body {
 }
 
 .cms-admin-editor > cms-affiliate[data-editor-active="true"],
+.cms-admin-editor > cms-merch[data-editor-active="true"],
 .cms-admin-editor > cms-block[data-editor-active="true"],
 .cms-admin-editor > figure[data-editor-active="true"] {
   box-shadow: 0 0 0 3px rgb(139 92 246 / 10%);
@@ -230,8 +245,8 @@ body {
 @media (max-width: 768px) {
   .public-theme {
     background-attachment: scroll;
-    background-position: center top, 62% top;
-    background-size: cover, auto 56rem;
+    background-position: center top, 60% top;
+    background-size: cover, auto 50rem;
   }
 }
 
@@ -244,5 +259,9 @@ body {
   .theme-primary-button:hover,
   .theme-secondary-button:hover {
     transform: none;
+  }
+
+  .merch-cart-drawer {
+    animation: none;
   }
 }

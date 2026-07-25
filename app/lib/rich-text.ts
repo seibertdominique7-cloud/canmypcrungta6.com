@@ -5,7 +5,7 @@ import { AFFILIATE_LINK_REL, isRichTextBody, richTextBody, richTextHtml } from '
 const allowedTags = [
   'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'del', 'small', 'h1', 'h2', 'h3', 'h4',
   'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'hr', 'a', 'table', 'thead', 'tbody',
-  'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'div', 'span', 'cms-affiliate', 'cms-block',
+  'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'div', 'span', 'cms-affiliate', 'cms-merch', 'cms-block',
 ];
 
 export function sanitizeRichTextHtml(html: string) {
@@ -18,6 +18,7 @@ export function sanitizeRichTextHtml(html: string) {
       figure: ['data-cms-image', 'data-align', 'data-size', 'contenteditable'],
       table: ['summary'], th: ['colspan', 'rowspan', 'scope'], td: ['colspan', 'rowspan'],
       'cms-affiliate': ['product-id', 'contenteditable'],
+      'cms-merch': ['product-id', 'contenteditable'],
       'cms-block': ['kind', 'argument', 'contenteditable'],
     },
     allowedSchemes: ['http', 'https', 'mailto'],
@@ -52,11 +53,12 @@ export function sanitizeRichTextBody(body: string) {
 export type RichTextSegment =
   | { kind: 'html'; html: string }
   | { kind: 'affiliate'; productId: string }
+  | { kind: 'merchandise'; productId: string }
   | { kind: 'custom'; blockKind: string; argument: string; text: string };
 
 export function parseRichTextSegments(body: string): RichTextSegment[] {
   const html = sanitizeRichTextHtml(richTextHtml(body));
-  const pattern = /<(cms-affiliate|cms-block)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  const pattern = /<(cms-affiliate|cms-merch|cms-block)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
   const segments: RichTextSegment[] = [];
   let offset = 0;
   for (const match of html.matchAll(pattern)) {
@@ -65,6 +67,8 @@ export function parseRichTextSegments(body: string): RichTextSegment[] {
     const attributes = match[2];
     if (match[1].toLowerCase() === 'cms-affiliate') {
       segments.push({ kind: 'affiliate', productId: attribute(attributes, 'product-id') });
+    } else if (match[1].toLowerCase() === 'cms-merch') {
+      segments.push({ kind: 'merchandise', productId: attribute(attributes, 'product-id') });
     } else {
       segments.push({ kind: 'custom', blockKind: attribute(attributes, 'kind'), argument: attribute(attributes, 'argument'), text: plainText(match[3]) });
     }

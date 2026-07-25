@@ -48,10 +48,6 @@ export function PublicPage({ page, preview = false, path }: { page: PageRecord; 
   return (
     <main className="public-theme min-h-screen px-4 py-6 text-slate-100 sm:px-6 sm:py-10">
       <div className={`mx-auto ${widthClass}`}>
-        <nav aria-label="Primary" className="mb-8 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <Link className="font-black text-white" href="/">CanMyPCRunGTA6</Link>
-          <div className="flex items-center gap-4 text-slate-400"><Link className="theme-link" href="/">PC Checker</Link><Link className="theme-link" href="/articles">Articles</Link></div>
-        </nav>
         <article className="theme-glass-strong rounded-3xl p-5 sm:p-8 lg:p-10">
           {preview ? <p className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm font-bold text-amber-200">Private draft preview</p> : null}
           <nav aria-label="Breadcrumb" className="text-sm text-slate-500"><Link className="hover:text-violet-300" href="/">PC Checker</Link><span className="mx-2" aria-hidden="true">/</span>{page.title}</nav>

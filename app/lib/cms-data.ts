@@ -18,6 +18,7 @@ import type {
 } from './cms-types';
 import type { ArticleInput, PageInput } from './cms-validation';
 import type { AffiliateRetailer, ProductComponentType } from './affiliate-types';
+import type { MerchandiseProductRecord } from './merch-types';
 import { createSlug, validatePath } from './cms-validation';
 import { AdminDataError } from './admin-data-error';
 import { validateExternalImageUrl } from './media-validation';
@@ -45,7 +46,7 @@ const pageInclude = {
 type PageWithFaqs = Prisma.ContentPageGetPayload<{ include: typeof pageInclude }>;
 
 export async function getContentWorkspace(): Promise<ContentWorkspace> {
-  const [articles, pages, categories, tags, media, mediaFolders, affiliateProducts, revisions] = await Promise.all([
+  const [articles, pages, categories, tags, media, mediaFolders, affiliateProducts, merchandiseProducts, revisions] = await Promise.all([
     prisma.article.findMany({ orderBy: { updatedAt: 'desc' }, include: articleInclude }),
     prisma.contentPage.findMany({ orderBy: { updatedAt: 'desc' }, include: pageInclude }),
     prisma.contentCategory.findMany({ orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { articles: true } } } }),
@@ -72,6 +73,9 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
         },
       },
     }),
+    prisma.merchandiseProduct.findMany({
+      orderBy: [{ displayOrder: 'asc' }, { title: 'asc' }],
+    }),
     prisma.contentRevision.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
   return {
@@ -87,6 +91,13 @@ export async function getContentWorkspace(): Promise<ContentWorkspace> {
       componentType: product.componentType as ProductComponentType,
       priceText: defaultPriceText,
       badge: assignments[0]?.badge ?? 'None',
+    })),
+    merchandiseProducts: merchandiseProducts.map((product) => ({
+      ...product,
+      productType: product.productType as MerchandiseProductRecord['productType'],
+      source: product.source as MerchandiseProductRecord['source'],
+      createdAt: product.createdAt.toISOString(),
+      updatedAt: product.updatedAt.toISOString(),
     })),
   };
 }
@@ -584,6 +595,7 @@ export async function replaceMediaAsset(id: string, replacementId: string) {
       transaction.contentPage.updateMany({ where: { twitterImage: oldUrl }, data: { twitterImage: newUrl } }),
       transaction.contentCategory.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
       transaction.product.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
+      transaction.merchandiseProduct.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
       transaction.affiliateProduct.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
       transaction.legacyAffiliateLink.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
       transaction.gamePurchaseLink.updateMany({ where: { imageUrl: oldUrl }, data: { imageUrl: newUrl } }),
@@ -800,11 +812,12 @@ async function trimRevisions(kind: 'article' | 'page', contentId: string) {
 }
 
 async function getMediaUsage(url: string): Promise<MediaUsageRecord[]> {
-  const [articles, pages, categories, products, legacyProducts, siteContent] = await Promise.all([
+  const [articles, pages, categories, products, merchandiseProducts, legacyProducts, siteContent] = await Promise.all([
     prisma.article.findMany({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] }, select: { id: true, title: true, featuredImage: true, openGraphImage: true, twitterImage: true, body: true } }),
     prisma.contentPage.findMany({ where: { OR: [{ featuredImage: url }, { openGraphImage: url }, { twitterImage: url }, { body: { contains: url } }] }, select: { id: true, title: true, featuredImage: true, openGraphImage: true, twitterImage: true, body: true } }),
     prisma.contentCategory.findMany({ where: { imageUrl: url }, select: { id: true, name: true } }),
     prisma.product.findMany({ where: { imageUrl: url }, select: { id: true, title: true } }),
+    prisma.merchandiseProduct.findMany({ where: { imageUrl: url }, select: { id: true, title: true } }),
     prisma.affiliateProduct.findMany({ where: { imageUrl: url }, select: { id: true, title: true } }),
     prisma.siteContent.findMany({ where: { value: { contains: url } }, select: { key: true, label: true } }),
   ]);
@@ -819,6 +832,7 @@ async function getMediaUsage(url: string): Promise<MediaUsageRecord[]> {
   articles.forEach((item) => addContent('article', item)); pages.forEach((item) => addContent('page', item));
   categories.forEach((item) => usages.push({ id: `category:${item.id}`, kind: 'category', location: 'Category image', label: item.name, adminUrl: '/admin/categories' }));
   products.forEach((item) => usages.push({ id: `product:${item.id}`, kind: 'affiliate-product', location: 'Product image', label: item.title, adminUrl: '/admin/products' }));
+  merchandiseProducts.forEach((item) => usages.push({ id: `merchandise:${item.id}`, kind: 'merchandise-product', location: 'Merchandise image', label: item.title || 'Untitled merchandise', adminUrl: '/admin/merchandise' }));
   legacyProducts.forEach((item) => usages.push({ id: `affiliate-product:${item.id}`, kind: 'affiliate-product', location: 'Legacy recommendation product', label: item.title, adminUrl: '/admin/recommendations' }));
   siteContent.forEach((item) => usages.push({ id: `site-content:${item.key}`, kind: 'site-content', location: 'Site content', label: item.label, adminUrl: '/admin/site-content' }));
   return usages;

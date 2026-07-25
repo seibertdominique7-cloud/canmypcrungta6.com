@@ -3,8 +3,15 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AdsenseScript } from './components/ads/AdsenseScript';
 import { AdConfigurationProvider } from './components/ads/AdConfigurationProvider';
 import { FooterAd } from './components/ads/AdPlacements';
+import { GoogleAnalytics } from './components/analytics/GoogleAnalytics';
 import { SiteFooter } from './components/SiteFooter';
+import { SiteHeader } from './components/SiteHeader';
+import { PublicChrome } from './components/PublicChrome';
+import { StoreAnnouncement } from './components/merch/StoreAnnouncement';
 import { getPublicAdConfiguration } from './lib/ad-data';
+import { isFourthwallConfigured } from './lib/fourthwall';
+import { getMerchStoreSettings } from './lib/merch-data';
+import { isPublicMerchStore } from './lib/merch-validation';
 import { getSiteUrl } from './lib/seo';
 import "./globals.css";
 
@@ -52,7 +59,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const adConfiguration = await getPublicAdConfiguration();
+  const [adConfiguration, merchSettings] = await Promise.all([
+    getPublicAdConfiguration(),
+    getMerchStoreSettings(),
+  ]);
+  const publicMerchStore = isPublicMerchStore(merchSettings);
+  const fourthwallEnabled = isFourthwallConfigured();
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? '';
 
   return (
     <html
@@ -61,12 +74,29 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AdConfigurationProvider initialConfiguration={adConfiguration}>
+          <PublicChrome>
+            {publicMerchStore &&
+            merchSettings.announcementEnabled &&
+            merchSettings.announcementText ? (
+              <StoreAnnouncement text={merchSettings.announcementText} />
+            ) : null}
+            <SiteHeader
+              fourthwallEnabled={fourthwallEnabled}
+              merchSettings={merchSettings}
+            />
+          </PublicChrome>
           {children}
           <FooterAd className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6" />
-          <SiteFooter />
+          <SiteFooter
+            fourthwallEnabled={fourthwallEnabled}
+            merchSettings={merchSettings}
+          />
           <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'CanMyPCRunGTA6', url: getSiteUrl() }).replace(/</g, '\\u003c') }} type="application/ld+json" />
           <AdsenseScript />
         </AdConfigurationProvider>
+        {gaMeasurementId ? (
+          <GoogleAnalytics measurementId={gaMeasurementId} />
+        ) : null}
       </body>
     </html>
   );

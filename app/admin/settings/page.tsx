@@ -1,1 +1,37 @@
-import { AdminHeader } from '../../components/admin/AdminHeader'; import { requireAdminPage } from '../../lib/admin-auth'; export const dynamic = 'force-dynamic'; export default async function Page() { await requireAdminPage(); const provider = process.env.MEDIA_STORAGE_PROVIDER || 'local'; return <main className="admin-theme min-h-screen px-4 py-8 text-slate-100"><div className="mx-auto max-w-5xl"><AdminHeader active="settings" /><section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"><h1 className="text-3xl font-black">Settings</h1><div className="mt-5 grid gap-3 text-sm"><p className="rounded-xl border border-white/10 bg-black/20 p-4"><strong>Media storage:</strong> {provider}{process.env.NODE_ENV === 'production' && provider === 'local' ? ' (production uploads disabled until persistent storage is configured)' : ''}</p><p className="rounded-xl border border-white/10 bg-black/20 p-4"><strong>Site URL:</strong> {process.env.SITE_URL || 'Not configured'}</p><p className="rounded-xl border border-white/10 bg-black/20 p-4"><strong>Revision retention:</strong> latest 20 versions per article or page</p></div></section></div></main>; }
+import { AdminHeader } from '../../components/admin/AdminHeader';
+import { MerchStoreSettingsForm } from '../../components/admin/MerchStoreSettingsForm';
+import { requireAdminPage } from '../../lib/admin-auth';
+import { getMerchStoreSettings } from '../../lib/merch-data';
+
+export const dynamic = 'force-dynamic';
+
+export default async function Page() {
+  await requireAdminPage();
+  const provider = process.env.MEDIA_STORAGE_PROVIDER || 'local';
+  const merchSettings = await getMerchStoreSettings();
+  return (
+    <main className="admin-theme min-h-screen px-4 py-8 text-slate-100">
+      <div className="mx-auto max-w-5xl">
+        <AdminHeader active="settings" />
+        <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+          <h1 className="text-3xl font-black">Settings</h1>
+          <div className="mt-5 grid gap-3 text-sm">
+            <p className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <strong>Media storage:</strong> {provider}
+              {process.env.NODE_ENV === 'production' && provider === 'local'
+                ? ' (production uploads disabled until persistent storage is configured)'
+                : ''}
+            </p>
+            <p className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <strong>Site URL:</strong> {process.env.SITE_URL || 'Not configured'}
+            </p>
+            <p className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <strong>Revision retention:</strong> latest 20 versions per article or page
+            </p>
+          </div>
+        </section>
+        <MerchStoreSettingsForm initialSettings={merchSettings} />
+      </div>
+    </main>
+  );
+}

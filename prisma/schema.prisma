@@ -75,6 +75,33 @@ model Product {
   @@index([valueTier, enabled])
 }
 
+model MerchandiseProduct {
+  id               String   @id @default(cuid())
+  title            String   @default("")
+  shortDescription String   @default("")
+  productUrl       String   @default("")
+  imageUrl         String?
+  productType      String   @default("T-Shirt")
+  badge            String   @default("")
+  priceText        String   @default("")
+  enabled          Boolean  @default(false)
+  featured         Boolean  @default(false)
+  displayOrder     Int      @default(0)
+  homepageVisible  Boolean  @default(false)
+  storeVisible     Boolean  @default(false)
+  articleVisible   Boolean  @default(false)
+  notes            String   @default("")
+  source           String   @default("manual")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([enabled, displayOrder])
+  @@index([homepageVisible, enabled, displayOrder])
+  @@index([storeVisible, enabled, displayOrder])
+  @@index([articleVisible, enabled, displayOrder])
+  @@index([productType, enabled])
+}
+
 model RecommendationAssignment {
   id                  String                @id @default(cuid())
   productId           String

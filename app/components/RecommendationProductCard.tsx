@@ -125,6 +125,8 @@ export function RecommendationProductCard({
           ) : (
             <a
               className={callToActionClass}
+              data-analytics-product-category={categoryLabel || product.componentType}
+              data-analytics-product-name={product.title}
               href={product.affiliateUrl}
               onClick={onAction}
               rel="sponsored nofollow noopener noreferrer"

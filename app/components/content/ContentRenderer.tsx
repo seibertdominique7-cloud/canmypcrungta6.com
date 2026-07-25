@@ -5,13 +5,16 @@ import { prisma } from '../../lib/prisma';
 import { getSiteContentMap } from '../../lib/cms-data';
 import { EmailSignup } from '../EmailSignup';
 import { RecommendationProductCard } from '../RecommendationProductCard';
+import { MerchProductCard } from '../merch/MerchProductCard';
 import { ArticleMiddleAd, ArticleTopAd } from '../ads/AdPlacements';
 import type { AffiliateProductRecord } from '../../lib/affiliate-types';
 import { hasInlineAffiliateLinks, isRichTextBody } from '../../lib/rich-text-shared';
 import { parseRichTextSegments } from '../../lib/rich-text';
 import { withFallbackImageAlt } from '../../lib/image-alt';
+import { getArticleMerchandise } from '../../lib/merch-data';
+import type { MerchandiseProductRecord, MerchStoreSettings } from '../../lib/merch-types';
 
-type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
+type CustomBlock = { kind: 'callout' | 'faq' | 'affiliate' | 'merchandise' | 'email-signup' | 'ad' | 'checker'; argument: string; text: string };
 type ImageBlock = { kind: 'image'; url: string; alt: string; caption: string; align: 'left' | 'center' | 'right' | 'full'; size: 'small' | 'medium' | 'large' | 'full'; link: string };
 type Block =
   | { kind: 'rich-html'; html: string }
@@ -27,13 +30,17 @@ type Block =
 export async function ContentRenderer({ body, articleAds = false, imageAltFallback = 'Content image' }: { body: string; articleAds?: boolean; imageAltFallback?: string }) {
   const blocks = parseContent(body);
   const productIds = blocks.filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'affiliate').map((block) => block.argument).filter(Boolean);
-  const [products, siteContent] = await Promise.all([
+  const merchandiseIds = blocks.filter((block): block is CustomBlock => isCustomBlock(block) && block.kind === 'merchandise').map((block) => block.argument).filter(Boolean);
+  const [products, merchandise, siteContent] = await Promise.all([
     productIds.length ? prisma.product.findMany({ where: { id: { in: productIds }, enabled: true } }) : [],
+    getArticleMerchandise(merchandiseIds),
     getSiteContentMap(),
   ]);
   const productMap = new Map(products.map((product) => [product.id, product]));
+  const merchandiseMap = new Map(merchandise.products.map((product) => [product.id, product]));
   const hasAffiliate = hasInlineAffiliateLinks(body)
     || blocks.some((block) => isCustomBlock(block) && block.kind === 'affiliate' && productMap.has(block.argument));
+  const hasMerchandise = blocks.some((block) => isCustomBlock(block) && block.kind === 'merchandise' && merchandiseMap.has(block.argument));
   const articleTopAfter = articleAds && blocks.length > 0 ? Math.min(1, blocks.length - 1) : -1;
   const articleMiddleAfter = articleAds && blocks.length >= 6
     ? Math.min(blocks.length - 2, Math.max(articleTopAfter + 2, Math.floor(blocks.length / 2)))
@@ -43,12 +50,13 @@ export async function ContentRenderer({ body, articleAds = false, imageAltFallba
     <div className="content-renderer grid gap-4 text-base leading-7 text-slate-200">
       {blocks.map((block, index) => (
         <Fragment key={`content-block-${index}`}>
-          {renderBlock(block, index, productMap, siteContent, imageAltFallback)}
+          {renderBlock(block, index, productMap, merchandiseMap, merchandise.settings, siteContent, imageAltFallback)}
           {index === articleTopAfter ? <ArticleTopAd className="my-5 w-full" /> : null}
           {index === articleMiddleAfter ? <ArticleMiddleAd className="my-5 w-full" /> : null}
         </Fragment>
       ))}
       {hasAffiliate ? <p className="mt-2 border-t border-white/10 pt-4 text-xs leading-5 text-slate-500">{siteContent.affiliate_disclosure || 'Disclosure: We may earn a commission when you purchase through links on this page, at no additional cost to you.'}</p> : null}
+      {hasMerchandise ? <p className="text-xs leading-5 text-slate-500">{merchandise.settings.disclaimerText}</p> : null}
     </div>
   );
 }
@@ -67,6 +75,7 @@ function parseContent(body: string): Block[] {
     const richBlocks = parseRichTextSegments(body).flatMap<Block>((segment): Block[] => {
       if (segment.kind === 'html') return [{ kind: 'rich-html' as const, html: segment.html }];
       if (segment.kind === 'affiliate') return [{ kind: 'affiliate' as const, argument: segment.productId, text: '' }];
+      if (segment.kind === 'merchandise') return [{ kind: 'merchandise' as const, argument: segment.productId, text: '' }];
       if (['callout', 'faq', 'email-signup', 'ad', 'checker'].includes(segment.blockKind)) {
         return [{ kind: segment.blockKind as CustomBlock['kind'], argument: segment.argument, text: segment.text }];
       }
@@ -93,7 +102,7 @@ function parseContent(body: string): Block[] {
       index += 1;
       while (index < lines.length && lines[index].trim() !== ':::') content.push(lines[index++]);
       if (kind === 'image') { const image = parseImageBlock(content); if (image) blocks.push(image); }
-      else if (['callout', 'faq', 'affiliate', 'email-signup', 'ad', 'checker'].includes(kind)) blocks.push({ kind: kind as 'callout', argument: argumentParts.join(' '), text: content.join('\n').trim() });
+      else if (['callout', 'faq', 'affiliate', 'merchandise', 'email-signup', 'ad', 'checker'].includes(kind)) blocks.push({ kind: kind as 'callout', argument: argumentParts.join(' '), text: content.join('\n').trim() });
       index += 1; continue;
     }
     const heading = /^(#{1,6})\s+(.+)$/.exec(line);
@@ -118,13 +127,21 @@ function parseContent(body: string): Block[] {
 }
 
 function moveEarlyMonetization(blocks: Block[]) {
-  const isMonetized = (block: Block) => ['affiliate', 'email-signup', 'ad'].includes(block.kind);
+  const isMonetized = (block: Block) => ['affiliate', 'merchandise', 'email-signup', 'ad'].includes(block.kind);
   const early = blocks.slice(0, 2).filter(isMonetized);
   if (!early.length) return blocks;
   return [...blocks.slice(0, 2).filter((block) => !isMonetized(block)), ...blocks.slice(2), ...early];
 }
 
-function renderBlock(block: Block, index: number, products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>, siteContent: Record<string, string>, imageAltFallback: string) : ReactNode {
+function renderBlock(
+  block: Block,
+  index: number,
+  products: Map<string, Awaited<ReturnType<typeof prisma.product.findFirstOrThrow>>>,
+  merchandise: Map<string, MerchandiseProductRecord>,
+  merchSettings: MerchStoreSettings,
+  siteContent: Record<string, string>,
+  imageAltFallback: string,
+) : ReactNode {
   const key = `${block.kind}-${index}`;
   if (block.kind === 'rich-html') {
     return (
@@ -155,6 +172,10 @@ function renderBlock(block: Block, index: number, products: Map<string, Awaited<
   if (block.kind === 'checker') return <a className="inline-flex justify-center rounded-xl bg-violet-500 px-5 py-3 font-black text-white hover:bg-violet-400" href="/" key={key}>{block.text || 'Check whether your PC can run GTA VI'}</a>;
   if (block.kind === 'ad') return <div aria-label="Advertisement" className="min-h-20 rounded-xl border border-dashed border-white/10 p-3 text-center text-xs text-slate-600" data-ad-slot={block.argument} key={key}>Advertisement</div>;
   if (block.kind === 'affiliate') { const product = products.get(block.argument); return product ? <div className="max-w-xl" key={key}><RecommendationProductCard headingLevel="h2" product={toAffiliateProduct(product)} /></div> : null; }
+  if (block.kind === 'merchandise') {
+    const product = merchandise.get(block.argument);
+    return product ? <div className="max-w-xl" key={key}><MerchProductCard openInNewTab={merchSettings.openLinksInNewTab} placement="article" product={product} /></div> : null;
+  }
   return null;
 }
 
