@@ -78,6 +78,9 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <AdsenseScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <AdConfigurationProvider initialConfiguration={adConfiguration}>
           <PublicChrome>
@@ -98,7 +101,6 @@ export default async function RootLayout({
             merchSettings={merchSettings}
           />
           <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Organization', name: 'CanMyPCRunGTA6', url: getSiteUrl() }).replace(/</g, '\\u003c') }} type="application/ld+json" />
-          <AdsenseScript />
         </AdConfigurationProvider>
         {gaMeasurementId ? (
           <GoogleAnalytics measurementId={gaMeasurementId} />

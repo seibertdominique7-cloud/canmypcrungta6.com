@@ -1,20 +1,15 @@
-'use client';
-
 import Script from 'next/script';
 
-import { useAdConfiguration } from './AdConfigurationProvider';
+const ADSENSE_CLIENT = 'ca-pub-3318524075868220';
 
 export function AdsenseScript() {
-  const { configuration, previewPlacement, ready } = useAdConfiguration();
-  if (!ready || previewPlacement || !configuration.scriptClient) return null;
-
   return (
     <Script
       async
       crossOrigin="anonymous"
       id="google-adsense"
-      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(configuration.scriptClient)}`}
-      strategy="afterInteractive"
+      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+      strategy="beforeInteractive"
     />
   );
 }
