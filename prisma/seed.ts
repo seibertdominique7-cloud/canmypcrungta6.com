@@ -1,6 +1,5 @@
-import 'dotenv/config';
-
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { loadEnvConfig } from '@next/env';
+import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaClient } from '../generated/prisma/client';
 import { CORE_RECOMMENDATION_SCENARIOS } from '../app/data/recommendation-scenarios';
 import { PREBUILT_RECOMMENDATION_GROUPS } from '../app/data/prebuilt-groups';
@@ -12,9 +11,21 @@ import { DEFAULT_AD_PLACEMENTS } from '../app/data/ad-placements';
 import { REQUIRED_PAGES } from '../app/data/required-pages';
 import { CREATOR_SCENARIO_DEFAULTS } from '../app/data/creator-recommendations';
 
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL ?? 'file:./dev.db',
-});
+loadEnvConfig(process.cwd());
+
+const databaseUrl = process.env.DATABASE_URL?.trim();
+
+if (!databaseUrl) {
+  throw new Error(
+    'DATABASE_URL is not configured. Add the pooled Neon PostgreSQL connection string before seeding.',
+  );
+}
+
+if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+  throw new Error('DATABASE_URL must be a PostgreSQL connection string.');
+}
+
+const adapter = new PrismaNeon({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 const defaultContentCategories = [

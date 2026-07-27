@@ -11,16 +11,21 @@ instructions.
 
 ## Getting Started
 
-First, run the development server:
+Create a Neon development branch and copy its pooled and direct PostgreSQL connection strings into
+`.env.local`:
+
+```dotenv
+DATABASE_URL="postgresql://USER:PASSWORD@HOST-pooler.REGION.aws.neon.tech/DATABASE?sslmode=require"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST.REGION.aws.neon.tech/DATABASE?sslmode=require"
+```
+
+Then prepare the database and run the development server:
 
 ```bash
+npm install
+npm run db:deploy
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -97,7 +102,27 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Create or connect a Neon PostgreSQL database, then add these encrypted environment variables to the
+Vercel project:
+
+- `DATABASE_URL`: the pooled Neon connection string (its hostname normally contains `-pooler`).
+- `DIRECT_URL`: the direct, non-pooled Neon connection string used by Prisma migrations.
+
+Apply both variables to Production. Apply them to Preview and Development too if those deployments
+should use Neon; separate Neon branches are recommended so preview builds cannot change production
+data. Do not prefix either variable with `NEXT_PUBLIC_`.
+
+Vercel uses the repository's `vercel.json` build command, which runs `prisma migrate deploy`
+before `next build`, so the PostgreSQL schema is created or upgraded before Next.js renders the
+application. Local `npm run build` remains a database-independent compiler check. After the first deployment, run
+`npm run db:seed` once against the intended Neon database if it needs the app's structural seed
+records. Seeding is deliberately not part of every build.
+
+The previous local SQLite data was not deleted. A verified pre-conversion backup is stored locally
+at `prisma/backups/dev-before-neon-postgres-20260726-160547.db` (SHA-256:
+`1394CF8DD89F7AD307E037E914D7C1C44D07369CFB192DFF3B8A5E06C3D6D6A5`). Backups are ignored by Git
+and are not deployed to Vercel. The new baseline migration creates the PostgreSQL schema; it does
+not silently copy local SQLite rows into Neon.
 
 Production admin authentication requires `ADMIN_PASSWORD` and `SESSION_SECRET` in the Vercel
 project environment settings. Environment-variable changes only apply after a new deployment, so

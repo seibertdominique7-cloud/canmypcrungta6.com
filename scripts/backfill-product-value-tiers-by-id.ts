@@ -6,9 +6,8 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
 
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaNeon } from '@prisma/adapter-neon';
 import { loadEnvConfig } from '@next/env';
 
 import { PRODUCT_VALUE_TIERS, type ProductValueTier } from '../app/lib/affiliate-types';
@@ -20,8 +19,8 @@ const CSV_PATH =
 loadEnvConfig(process.cwd());
 
 const applyChanges = process.argv.includes('--apply');
-const databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./dev.db';
-const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
+const databaseUrl = requireNeonDatabaseUrl();
+const adapter = new PrismaNeon({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 interface CsvRow {
@@ -98,12 +97,11 @@ async function main() {
     await prisma.$transaction(async (transaction) => {
       const protectedStateBefore = await protectedStateDigest(transaction);
       for (const row of productsToUpdate) {
-        productsUpdated += await transaction.$executeRawUnsafe(
-          'UPDATE "Product" SET "valueTier" = ? WHERE "id" = ? AND ("valueTier" IS NULL OR "valueTier" <> ?)',
-          row.valueTier,
-          row.productId,
-          row.valueTier,
-        );
+        await transaction.product.update({
+          where: { id: row.productId },
+          data: { valueTier: row.valueTier },
+        });
+        productsUpdated += 1;
       }
       const protectedStateAfter = await protectedStateDigest(transaction);
       protectedFieldsUnchanged = protectedStateBefore === protectedStateAfter;
@@ -314,9 +312,20 @@ async function protectedStateDigest(client: ProtectedClient) {
 }
 
 function describeDatabase(url: string) {
-  if (!url.startsWith('file:')) return 'Configured non-file database';
-  const filePath = url.slice('file:'.length);
-  return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return 'Configured PostgreSQL database';
+  }
+}
+
+function requireNeonDatabaseUrl() {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url || !/^postgres(?:ql)?:\/\//i.test(url)) {
+    throw new Error('DATABASE_URL must contain a Neon PostgreSQL connection string.');
+  }
+  return url;
 }
 
 main()

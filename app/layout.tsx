@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { connection } from 'next/server';
 import { AdsenseScript } from './components/ads/AdsenseScript';
 import { AdConfigurationProvider } from './components/ads/AdConfigurationProvider';
 import { FooterAd } from './components/ads/AdPlacements';
@@ -59,6 +60,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Navigation, ads, and merch settings are database-managed content. Resolve
+  // them per request instead of requiring the production database while Next
+  // inspects and prerenders route modules during a local build.
+  await connection();
+
   const [adConfiguration, merchSettings] = await Promise.all([
     getPublicAdConfiguration(),
     getMerchStoreSettings(),

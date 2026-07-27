@@ -4,70 +4,70 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model RecommendationScenario {
-  id                   String                  @id @default(cuid())
-  code                 String                  @unique
-  displayName          String
-  resultHeading        String                  @map("heading")
-  resultDescription    String                  @map("description")
-  enabled              Boolean                 @default(true)
-  displayOrder         Int
-  isCore               Boolean                 @default(false)
-  groupType            String                  @default("SCENARIO")
-  sections             RecommendationSection[]
-  legacyAffiliateLinks LegacyAffiliateLink[]
+  id                    String                      @id @default(cuid())
+  code                  String                      @unique
+  displayName           String
+  resultHeading         String                      @map("heading")
+  resultDescription     String                      @map("description")
+  enabled               Boolean                     @default(true)
+  displayOrder          Int
+  isCore                Boolean                     @default(false)
+  groupType             String                      @default("SCENARIO")
+  sections              RecommendationSection[]
+  legacyAffiliateLinks  LegacyAffiliateLink[]
   creatorRecommendation CreatorRecommendation?
-  recommendationRules RecommendationRule[]
-  creatorRules       CreatorRecommendationRule[]
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  recommendationRules   RecommendationRule[]
+  creatorRules          CreatorRecommendationRule[]
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
 
   @@index([groupType, enabled, displayOrder])
 }
 
 model RecommendationSection {
-  id                 String                 @id @default(cuid())
-  scenarioId         String
-  scenario           RecommendationScenario @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
-  title              String
-  description        String
-  enabled            Boolean                @default(true)
-  displayOrder       Int
-  maxProducts        Int                    @default(3)
-  collapsedByDefault Boolean                @default(false)
-  layout             String                 @default("grid")
-  purpose            String                 @default("GENERAL")
-  isCore             Boolean                @default(false)
-  products           AffiliateProduct[]
-  assignments        RecommendationAssignment[]
+  id                  String                     @id @default(cuid())
+  scenarioId          String
+  scenario            RecommendationScenario     @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  title               String
+  description         String
+  enabled             Boolean                    @default(true)
+  displayOrder        Int
+  maxProducts         Int                        @default(3)
+  collapsedByDefault  Boolean                    @default(false)
+  layout              String                     @default("grid")
+  purpose             String                     @default("GENERAL")
+  isCore              Boolean                    @default(false)
+  products            AffiliateProduct[]
+  assignments         RecommendationAssignment[]
   recommendationRules RecommendationRule[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   @@index([scenarioId, enabled, displayOrder])
 }
 
 model Product {
-  id                  String                     @id @default(cuid())
-  title               String
-  canonicalName       String
-  componentType       String
-  shortDescription    String                     @default("")
-  imageUrl            String?
-  retailer            String                     @default("Other")
-  affiliateUrl        String
-  defaultPriceText    String                     @default("Check current price")
-  platform            String?
-  valueTier           String?
-  enabled             Boolean                    @default(true)
-  assignments         RecommendationAssignment[]
-  creatorAssignments  CreatorProductAssignment[]
-  ruleOverrides       RecommendationRuleOverride[]
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  id                 String                       @id @default(cuid())
+  title              String
+  canonicalName      String
+  componentType      String
+  shortDescription   String                       @default("")
+  imageUrl           String?
+  retailer           String                       @default("Other")
+  affiliateUrl       String
+  defaultPriceText   String                       @default("Check current price")
+  platform           String?
+  valueTier          String?
+  enabled            Boolean                      @default(true)
+  assignments        RecommendationAssignment[]
+  creatorAssignments CreatorProductAssignment[]
+  ruleOverrides      RecommendationRuleOverride[]
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
   @@index([canonicalName])
   @@index([componentType, enabled])
@@ -174,22 +174,22 @@ model RecommendationRuleOverride {
 }
 
 model CreatorRecommendation {
-  id                String                         @id @default(cuid())
-  scenarioId        String                         @unique
-  scenario          RecommendationScenario         @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
-  enabled           Boolean                        @default(false)
+  id                String                       @id @default(cuid())
+  scenarioId        String                       @unique
+  scenario          RecommendationScenario       @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  enabled           Boolean                      @default(false)
   headline          String
   subheadline       String
   description       String
-  warningText       String                         @default("")
+  warningText       String                       @default("")
   primaryCtaLabel   String
   primaryCtaUrl     String
-  secondaryCtaLabel String                         @default("")
-  secondaryCtaUrl   String                         @default("")
+  secondaryCtaLabel String                       @default("")
+  secondaryCtaUrl   String                       @default("")
   groups            CreatorRecommendationGroup[]
   guides            CreatorGuideLink[]
-  createdAt         DateTime                       @default(now())
-  updatedAt         DateTime                       @updatedAt
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
 
   @@index([enabled, updatedAt])
 }
@@ -232,15 +232,15 @@ model CreatorRecommendationGroup {
 }
 
 model CreatorProductAssignment {
-  id           String                         @id @default(cuid())
+  id           String                     @id @default(cuid())
   groupId      String
-  group        CreatorRecommendationGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group        CreatorRecommendationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   productId    String
-  product      Product                        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  enabled      Boolean                        @default(true)
+  product      Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  enabled      Boolean                    @default(true)
   displayOrder Int
-  createdAt    DateTime                       @default(now())
-  updatedAt    DateTime                       @updatedAt
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
 
   @@unique([groupId, productId])
   @@index([groupId, enabled, displayOrder])
@@ -329,14 +329,14 @@ model GamePurchaseLink {
 }
 
 model AdGlobalSettings {
-  id                    String   @id
-  masterEnabled         Boolean  @default(false)
-  defaultProvider       String   @default("disabled")
-  adsenseClient         String   @default("")
-  debugPlaceholders     Boolean  @default(false)
-  defaultLabel          String   @default("Advertisement")
-  defaultResponsive     Boolean  @default(true)
-  updatedAt             DateTime @updatedAt
+  id                String   @id
+  masterEnabled     Boolean  @default(false)
+  defaultProvider   String   @default("disabled")
+  adsenseClient     String   @default("")
+  debugPlaceholders Boolean  @default(false)
+  defaultLabel      String   @default("Advertisement")
+  defaultResponsive Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
 }
 
 model AdPlacement {
@@ -385,40 +385,40 @@ model EmailSubscriber {
 }
 
 model Article {
-  id                    String           @id @default(cuid())
-  title                 String
-  slug                  String           @unique
-  excerpt               String           @default("")
-  body                  String           @default("")
-  featuredImage         String?
-  featuredImagePrompt   String           @default("")
-  authorName            String           @default("CanMyPCRunGTA6")
-  status                String           @default("draft")
-  publishedAt           DateTime?
-  scheduledAt           DateTime?
-  featured              Boolean          @default(false)
-  contentType           String           @default("standard")
-  seoTitle              String           @default("")
-  metaDescription       String           @default("")
-  canonicalUrl          String?
-  openGraphTitle        String           @default("")
-  openGraphDescription  String           @default("")
-  openGraphImage        String?
-  twitterTitle          String           @default("")
-  twitterDescription    String           @default("")
-  twitterImage          String?
-  robotsIndex           Boolean          @default(true)
-  robotsFollow          Boolean          @default(true)
-  focusKeyword          String           @default("")
-  secondaryKeywords     String           @default("[]")
-  schemaType            String           @default("Article")
-  noindex               Boolean          @default(false)
-  categories            ArticleCategory[]
-  tags                  ArticleTag[]
-  relatedArticles       ArticleRelated[] @relation("ArticleRelatedSource")
-  relatedTo             ArticleRelated[] @relation("ArticleRelatedTarget")
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  id                   String            @id @default(cuid())
+  title                String
+  slug                 String            @unique
+  excerpt              String            @default("")
+  body                 String            @default("")
+  featuredImage        String?
+  featuredImagePrompt  String            @default("")
+  authorName           String            @default("CanMyPCRunGTA6")
+  status               String            @default("draft")
+  publishedAt          DateTime?
+  scheduledAt          DateTime?
+  featured             Boolean           @default(false)
+  contentType          String            @default("standard")
+  seoTitle             String            @default("")
+  metaDescription      String            @default("")
+  canonicalUrl         String?
+  openGraphTitle       String            @default("")
+  openGraphDescription String            @default("")
+  openGraphImage       String?
+  twitterTitle         String            @default("")
+  twitterDescription   String            @default("")
+  twitterImage         String?
+  robotsIndex          Boolean           @default(true)
+  robotsFollow         Boolean           @default(true)
+  focusKeyword         String            @default("")
+  secondaryKeywords    String            @default("[]")
+  schemaType           String            @default("Article")
+  noindex              Boolean           @default(false)
+  categories           ArticleCategory[]
+  tags                 ArticleTag[]
+  relatedArticles      ArticleRelated[]  @relation("ArticleRelatedSource")
+  relatedTo            ArticleRelated[]  @relation("ArticleRelatedTarget")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@index([status, publishedAt])
   @@index([status, scheduledAt])
@@ -426,41 +426,41 @@ model Article {
 }
 
 model ContentPage {
-  id                    String   @id @default(cuid())
-  title                 String
-  slug                  String   @unique
-  body                  String   @default("")
-  excerpt               String   @default("")
-  featuredImage         String?
-  status                String   @default("draft")
-  pageTemplate          String   @default("standard")
-  navigationLabel       String   @default("")
-  showInNavigation      Boolean  @default(false)
-  navigationOrder       Int      @default(0)
-  enabled               Boolean  @default(true)
-  requiredPageKey       String?  @unique
-  showInFooter          Boolean  @default(false)
-  footerLabel           String   @default("")
-  footerOrder           Int      @default(0)
-  footerGroup           String   @default("Resources")
-  publishedAt           DateTime?
-  seoTitle              String   @default("")
-  metaDescription       String   @default("")
-  canonicalUrl          String?
-  openGraphTitle        String   @default("")
-  openGraphDescription  String   @default("")
-  openGraphImage        String?
-  twitterTitle          String   @default("")
-  twitterDescription    String   @default("")
-  twitterImage          String?
-  robotsIndex           Boolean  @default(true)
-  robotsFollow          Boolean  @default(true)
-  focusKeyword          String   @default("")
-  schemaType            String   @default("WebPage")
-  noindex               Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  faqEntries            FaqEntry[]
+  id                   String     @id @default(cuid())
+  title                String
+  slug                 String     @unique
+  body                 String     @default("")
+  excerpt              String     @default("")
+  featuredImage        String?
+  status               String     @default("draft")
+  pageTemplate         String     @default("standard")
+  navigationLabel      String     @default("")
+  showInNavigation     Boolean    @default(false)
+  navigationOrder      Int        @default(0)
+  enabled              Boolean    @default(true)
+  requiredPageKey      String?    @unique
+  showInFooter         Boolean    @default(false)
+  footerLabel          String     @default("")
+  footerOrder          Int        @default(0)
+  footerGroup          String     @default("Resources")
+  publishedAt          DateTime?
+  seoTitle             String     @default("")
+  metaDescription      String     @default("")
+  canonicalUrl         String?
+  openGraphTitle       String     @default("")
+  openGraphDescription String     @default("")
+  openGraphImage       String?
+  twitterTitle         String     @default("")
+  twitterDescription   String     @default("")
+  twitterImage         String?
+  robotsIndex          Boolean    @default(true)
+  robotsFollow         Boolean    @default(true)
+  focusKeyword         String     @default("")
+  schemaType           String     @default("WebPage")
+  noindex              Boolean    @default(false)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  faqEntries           FaqEntry[]
 
   @@index([status, publishedAt])
   @@index([showInNavigation, navigationOrder])
@@ -557,14 +557,14 @@ model ArticleRelated {
 }
 
 model ContentRevision {
-  id               String   @id @default(cuid())
-  contentId        String
-  contentKind      String
-  titleSnapshot    String
-  bodySnapshot     String
+  id                 String   @id @default(cuid())
+  contentId          String
+  contentKind        String
+  titleSnapshot      String
+  bodySnapshot       String
   structuredSnapshot String?
-  editorIdentifier String?
-  createdAt        DateTime @default(now())
+  editorIdentifier   String?
+  createdAt          DateTime @default(now())
 
   @@index([contentKind, contentId, createdAt])
 }

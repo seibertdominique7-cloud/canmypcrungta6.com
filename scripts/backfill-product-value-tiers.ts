@@ -6,9 +6,8 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
 
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaNeon } from '@prisma/adapter-neon';
 import { loadEnvConfig } from '@next/env';
 
 import { PrismaClient } from '../generated/prisma/client';
@@ -24,10 +23,8 @@ const CSV_PATH =
 loadEnvConfig(process.cwd());
 
 const applyChanges = process.argv.includes('--apply');
-const databaseUrl = process.env.DATABASE_URL?.trim() || 'file:./dev.db';
-const adapter = new PrismaBetterSqlite3({
-  url: databaseUrl,
-});
+const databaseUrl = requireNeonDatabaseUrl();
+const adapter = new PrismaNeon({ connectionString: databaseUrl });
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
@@ -68,11 +65,14 @@ async function main() {
   if (applyChanges && updateCandidates.length > 0) {
     await prisma.$transaction(async (transaction) => {
       for (const match of updateCandidates) {
-        productsUpdated += await transaction.$executeRawUnsafe(
-          'UPDATE "Product" SET "valueTier" = ? WHERE "id" = ? AND "valueTier" IS NULL',
-          match.row.valueTier,
-          match.product.id,
-        );
+        const result = await transaction.product.updateMany({
+          where: {
+            id: match.product.id,
+            valueTier: null,
+          },
+          data: { valueTier: match.row.valueTier },
+        });
+        productsUpdated += result.count;
       }
     });
   }
@@ -208,9 +208,20 @@ async function protectedStateDigest() {
 }
 
 function describeDatabase(url: string) {
-  if (!url.startsWith('file:')) return 'Configured non-file database';
-  const filePath = url.slice('file:'.length);
-  return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+  } catch {
+    return 'Configured PostgreSQL database';
+  }
+}
+
+function requireNeonDatabaseUrl() {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url || !/^postgres(?:ql)?:\/\//i.test(url)) {
+    throw new Error('DATABASE_URL must contain a Neon PostgreSQL connection string.');
+  }
+  return url;
 }
 
 main()
