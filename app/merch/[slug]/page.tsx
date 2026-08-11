@@ -12,7 +12,6 @@ import {
   getFourthwallImageUrl,
   getFourthwallStartingPrice,
 } from '../../lib/fourthwall-types';
-import { getSiteUrl } from '../../lib/seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,26 +70,6 @@ export default async function MerchProductPage({
   if (!product) notFound();
 
   const startingPrice = getFourthwallStartingPrice(product);
-  const image = getFourthwallImageUrl(product.images[0]);
-  const productUrl = `${getSiteUrl()}/merch/${product.slug}`;
-  const structuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: product.name,
-    description: product.description || undefined,
-    image: image ? [image] : undefined,
-    url: productUrl,
-    offers: startingPrice
-      ? {
-          '@type': 'AggregateOffer',
-          lowPrice: Number(startingPrice.value),
-          priceCurrency: startingPrice.currency,
-          offerCount: product.variants.length,
-          availability: 'https://schema.org/InStock',
-          url: productUrl,
-        }
-      : undefined,
-  };
 
   return (
     <main className="public-theme min-h-screen px-4 py-8 text-slate-100 sm:px-6 sm:py-12">
@@ -109,12 +88,6 @@ export default async function MerchProductPage({
             Starting at {formatFourthwallMoney(startingPrice)}
           </p>
         ) : null}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(structuredData).replace(/</g, '\\u003c'),
-          }}
-          type="application/ld+json"
-        />
       </div>
     </main>
   );
